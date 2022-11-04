@@ -1,5 +1,6 @@
 mod encoded_string;
 mod error;
+mod flags;
 mod main_result;
 
 use std::{
@@ -7,9 +8,9 @@ use std::{
 	env,
 	fs,
 	hash::Hash,
-	io::{self, BufRead, BufReader, BufWriter, Write, Seek, SeekFrom},
+	io::{self, BufRead, BufReader, Write},
 	path::Path,
-	process::Command
+	process::{Command, Stdio}
 };
 
 use {
@@ -19,6 +20,8 @@ use {
 };
 
 use {
+	flags::Flags,
+	getopt::{Opt, Parser},
 	itertools::Itertools,
 	tempfile::{Builder, NamedTempFile, TempDir}
 };
@@ -28,44 +31,71 @@ fn main() -> MainResult {
 }
 
 fn work() -> Result<(), Error> {
-	let old_files = env::args().skip(1).collect::<Vec<String>>();
-	if old_files.is_empty() {
-		return Err(Error::NoArgs);
+	let mut argv = env::args().collect::<Vec<String>>();
+	let mut flags = Flags { ..Default::default() };
+	let mut opts = Parser::new(&argv, ":0a");
+
+	loop {
+		match opts.next().transpose() {
+			Ok(v) => match v {
+				None => break,
+				Some(opt) => match opt {
+					Opt('0', None) => flags.nul = true,
+					Opt('e', None) => flags.encode = true,
+					Opt('i', None) => flags.individual = true,
+					_ => { return Err(Error::BadArgs); }
+				}
+			},
+			Err(_) => { return Err(Error::BadArgs); }
+		}
+	}
+
+	let rest = argv.split_off(opts.index());
+	let cmd  = rest.get(0).ok_or(Error::BadArgs)?;
+	let args = &rest[1..];
+
+	let old_files: Vec<_> = io::stdin()
+		.lines()
+		.collect::<Result<_, _>>()
+		.unwrap();
+	if old_files.iter().any(|s| s.is_empty()) {
+		return Err(Error::BadArgs);
 	}
 
 	let dups = duplicate_elements(old_files.clone());
 	if !dups.is_empty() {
-		return Err(Error::DuplicateElems(dups));
+		return Err(Error::DupInputElems(dups));
 	}
 
-	let mut tmpfile = NamedTempFile::new()?;
-	let mut writer = BufWriter::new(&tmpfile);
-
-	old_files.iter().try_for_each(|f| encode_to_file(&mut writer, f))?;
-	writer.flush()?;
-	drop(writer);
-
-	let editor = env::var("EDITOR")
-		.ok()
-		.filter(|e| !e.is_empty())
-		.ok_or(Error::NoEditor)?;
-
-	Command::new(&editor)
-		.arg(tmpfile.path().as_os_str())
+	let mut child = Command::new(cmd)
+		.args(args)
+		.stdin(Stdio::piped())
+		.stdout(Stdio::piped())
 		.spawn()
-		.map_err(|err| Error::SpawnFailed(editor, err))?
-		.wait()?;
+		.map_err(|e| Error::SpawnFailed(cmd.to_owned(), e))?;
 
-	tmpfile.seek(SeekFrom::Start(0))?;
+	{
+		let mut stdin = child.stdin.take().expect("Failed to open stdin");
+		old_files.iter().try_for_each(|f| writeln!(stdin, "{f}"))?;
+	}
 
-	let new_files = decode_from_file(&tmpfile)?;
+	let output = child.wait_with_output()?;
+	if !output.status.success() {
+		return Err(Error::Nop);
+	}
+
+	let new_files = String::from_utf8(output.stdout)?
+		.lines()
+		.map(|s| s.to_string())
+		.collect::<Vec<String>>();
+
 	if old_files.len() != new_files.len() {
 		return Err(Error::BadLengths);
 	}
 
 	let dups = duplicate_elements(new_files.iter().cloned().collect::<Vec<_>>());
 	if !dups.is_empty() {
-		return Err(Error::DuplicateElems(dups));
+		return Err(Error::DupOutputElems(dups));
 	}
 
 	let tmpdir = Builder::new().prefix("mmv").tempdir()?;
