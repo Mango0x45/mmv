@@ -89,11 +89,10 @@ where
 fn encode_to_file<W: Write>(f: &mut W, s: &str) -> io::Result<()> {
 	s.chars().try_for_each(|c| {
 		write!(f, "{}", match c {
-				'\\' => "\\\\",
-				'\n' => "\\n",
-				_ => return write!(f, "{}", c),
-			}
-		)
+			'\\' => "\\\\",
+			'\n' => "\\n",
+			_ => return write!(f, "{}", c),
+		})
 	})?;
 	write!(f, "{}", '\n')
 }
