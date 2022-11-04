@@ -29,6 +29,10 @@ fn main() -> MainResult {
 
 fn work() -> Result<(), Error> {
 	let old_files = env::args().skip(1).collect::<Vec<String>>();
+	if old_files.is_empty() {
+		return Err(Error::NoArgs);
+	}
+
 	let dups = duplicate_elements(old_files.clone());
 	if !dups.is_empty() {
 		return Err(Error::DuplicateElems(dups));

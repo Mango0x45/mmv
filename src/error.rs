@@ -8,6 +8,7 @@ pub enum Error {
 	BadLengths,
 	DuplicateElems(Vec<String>),
 	IOError(io::Error),
+	NoArgs,
 	NoEditor,
 	SpawnFailed(String, io::Error),
 }
@@ -21,6 +22,7 @@ impl Display for Error {
 				|d| writeln!(f, "{p}: Multiple files named \"{}\" specified", d)
 			),
 			Self::IOError(e) => writeln!(f, "{p}: {e}"),
+			Self::NoArgs => writeln!(f, "Usage: {p} file ..."),
 			Self::NoEditor => writeln!(f, "{p}: \"EDITOR\" environment variable is not set"),
 			Self::SpawnFailed(ed, e) => writeln!(f, "{p}: Failed to spawn editor \"{ed}\": {e}")
 		}
