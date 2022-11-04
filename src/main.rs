@@ -5,18 +5,22 @@ mod main_result;
 use std::{
 	collections::HashSet,
 	env,
+	fs,
 	hash::Hash,
 	io::{self, BufRead, BufReader, BufWriter, Write, Seek, SeekFrom},
+	path::Path,
 	process::Command
 };
 
-use encoded_string::*;
-use error::*;
-use main_result::*;
+use {
+	encoded_string::EncodedString,
+	error::Error,
+	main_result::MainResult
+};
 
 use {
 	itertools::Itertools,
-	tempfile::NamedTempFile
+	tempfile::{Builder, NamedTempFile, TempDir}
 };
 
 fn main() -> MainResult {
@@ -24,8 +28,8 @@ fn main() -> MainResult {
 }
 
 fn work() -> Result<(), Error> {
-	let files = env::args().skip(1).collect::<Vec<String>>();
-	let dups = duplicate_elements(files.clone());
+	let old_files = env::args().skip(1).collect::<Vec<String>>();
+	let dups = duplicate_elements(old_files.clone());
 	if !dups.is_empty() {
 		return Err(Error::DuplicateElems(dups));
 	}
@@ -33,7 +37,7 @@ fn work() -> Result<(), Error> {
 	let mut tmpfile = NamedTempFile::new()?;
 	let mut writer = BufWriter::new(&tmpfile);
 
-	files.iter().try_for_each(|f| encode_to_file(&mut writer, f))?;
+	old_files.iter().try_for_each(|f| encode_to_file(&mut writer, f))?;
 	writer.flush()?;
 	drop(writer);
 
@@ -49,26 +53,28 @@ fn work() -> Result<(), Error> {
 		.wait()?;
 
 	tmpfile.seek(SeekFrom::Start(0))?;
+
 	let new_files = decode_from_file(&tmpfile)?;
-
-	assert_changes(
-		    files.iter().cloned().collect(),
-		new_files.iter().cloned().collect()
-	)?;
-	new_files.iter().for_each(|f| println!("{}", f));
-
-	Ok(())
-}
-
-fn assert_changes(old: Vec<String>, new: Vec<String>) -> Result<(), Error> {
-	if old.len() != new.len() {
+	if old_files.len() != new_files.len() {
 		return Err(Error::BadLengths);
 	}
 
-	let dups = duplicate_elements(new);
+	let dups = duplicate_elements(new_files.iter().cloned().collect::<Vec<_>>());
 	if !dups.is_empty() {
 		return Err(Error::DuplicateElems(dups));
 	}
+
+	let tmpdir = Builder::new().prefix("mmv").tempdir()?;
+	let mut conflicts = Vec::<&str>::new();
+
+	old_files
+		.iter()
+		.zip(new_files.iter())
+		.filter(|(x, y)| x != y)
+		.try_for_each(|(x, y)| try_move(&mut conflicts, &tmpdir, x, y))?;
+	conflicts
+		.iter()
+		.try_for_each(|c| do_move(&tmpdir, c))?;
 
 	Ok(())
 }
@@ -108,4 +114,26 @@ fn decode_from_file(tmpfile: &NamedTempFile) -> Result<Vec<String>, io::Error> {
 			Err(_) => r
 		})
 		.collect::<Result<Vec<String>, _>>()
+}
+
+fn try_move<'a>(
+	conflicts: &mut Vec<&'a str>,
+	tmpdir: &TempDir,
+	old: &str,
+	new: &'a str
+) -> Result<(), io::Error> {
+	if Path::new(new).exists() {
+		let new_loc = tmpdir.path().to_str().unwrap().to_owned() + new;
+		fs::rename(old, new_loc)?;
+		conflicts.push(new);
+	} else {
+		fs::rename(old, new)?;
+	}
+	Ok(())
+}
+
+fn do_move(tmpdir: &TempDir, new: &str) -> Result<(), io::Error> {
+	let old = tmpdir.path().to_str().unwrap().to_owned() + new;
+	fs::rename(old, new)?;
+	Ok(())
 }
