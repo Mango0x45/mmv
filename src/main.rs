@@ -117,6 +117,10 @@ fn decode_from_file(tmpfile: &NamedTempFile) -> Result<Vec<String>, io::Error> {
 			},
 			Err(_) => r
 		})
+		.filter(|r| match r {
+			Ok(s) => !s.is_empty(),
+			_ => true
+		})
 		.collect::<Result<Vec<String>, _>>()
 }
 
