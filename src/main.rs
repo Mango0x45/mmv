@@ -123,7 +123,7 @@ fn try_move<'a>(
 	new: &'a str
 ) -> Result<(), io::Error> {
 	if Path::new(new).exists() {
-		let new_loc = tmpdir.path().to_str().unwrap().to_owned() + new;
+		let new_loc = tmpdir.path().to_str().unwrap().to_owned() + "/" + new;
 		fs::rename(old, new_loc)?;
 		conflicts.push(new);
 	} else {
@@ -133,7 +133,7 @@ fn try_move<'a>(
 }
 
 fn do_move(tmpdir: &TempDir, new: &str) -> Result<(), io::Error> {
-	let old = tmpdir.path().to_str().unwrap().to_owned() + new;
+	let old = tmpdir.path().to_str().unwrap().to_owned() + "/" + new;
 	fs::rename(old, new)?;
 	Ok(())
 }
