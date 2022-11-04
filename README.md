@@ -73,8 +73,8 @@ do I mean by “safer”?  Well consider that we want to make the following very
 simple file renamings:
 
 ```
-foo -> bar
-bar -> foo
+foo → bar
+bar → foo
 ```
 
 Most tools I’ve come across for renaming files will rename `foo` to `bar`, and
