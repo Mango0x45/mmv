@@ -65,4 +65,22 @@ ZZ         " Save and quit
 lowercased our filenames, and all it took was 15 keypresses (that includes the
 enter key, and saving the file)!
 
+## Safety
+
+Another advantage of `mmv` is that it’s a lot safer than your typical for-loop,
+or embarassingly enough even most file renaming tools I find online (lol).  What
+do I mean by “safer”?  Well consider that we want to make the following very
+simple file renamings:
+
+```
+foo -> bar
+bar -> foo
+```
+
+Most tools I’ve come across for renaming files will rename `foo` to `bar`, and
+then _oops!_, the original `bar` file no longer exists and we just lost our
+data!  Even if you were to do this manually (imagine a lot more files) you would
+need to go and move everything to a temporary directory, and move them back, and
+it’s kind of just a pain to do manually.  Luckily `mmv` handles this for you!
+
 [1]: https://superuser.com/q/29111
