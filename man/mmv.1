@@ -1,0 +1,99 @@
+.Dd $Mdocdate: November 4 2022 $
+.Dt MMV 1
+.Os
+.Sh NAME
+.Nm mmv
+.Nd move multiple files
+.Sh SYNOPSIS
+.Nm
+.Op Ar
+.Sh DESCRIPTION
+The
+.Nm
+utility opens a file populated with the file names given by
+.Ar
+in the editor specified by the
+.Ev EDITOR
+environment variable.
+The user can then make changes to the file names in their editor, and when the
+editor is closed
+.Nm
+will move the files according to the changes made within the editor after
+ensuring that the moving of files is safe.
+.Pp
+In order to ensure that all the files can be safely moved, the following checks
+are made:
+.Bl -bullet
+.It
+Removes all blank lines from the input and the output.
+.It
+Ensures that the number of input files is equal to the number of output files.
+This protects against a user accidentally removing a file from the file list.
+.It
+Ensures that all input files are unique and that all output files are unique.
+.El
+.Pp
+The
+.Nm
+utility also takes care to properly handle name swapping.
+If you would attempt to rename the files
+.Pa foo ,
+.Pa bar ,
+and
+.Pa baz
+to
+.Pa bar ,
+.Pa baz ,
+and
+.Pa foo ,
+then
+.Nm
+would make sure that no renaming operations accidentally overwrite the source of
+another renaming.
+.Pp
+As filenames can unfortunately contain newline characters and
+.Nm
+is a line-oriented tool, all filenames are encoded before being opened in the
+editor so that all newlines are replaced by the string
+.Dq \en
+and all backslashes are replaced by the string
+.Dq \e\e .
+Once the editor is closed
+.Nm
+reencodes the filenames, replacing all occurances of the string
+.Dq \en
+with a newline character and all occurances of the string
+.Dq \e\e
+with a backslash character.
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev EDITOR
+Editor to be used to edit the file list.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+Rename all files in the current directory:
+.Pp
+.Dl $ mmv *
+.Pp
+Rename all of the C source and header files in a projects’ directory:
+.Pp
+.Dl $ find \&. -type f -name '*.[ch]' -exec mmv {} +
+.Pp
+Rename all files in the current directory to use hyphens
+.Pq Sq -
+instead of spaces:
+.Pp
+.Bd -literal -offset indent
+$ EDITOR=vim mmv *
+$ # Once the vim buffer is open, run the following command:
+$ #   :%s/ /-/g
+.Ed
+.Sh SEE ALSO
+.Xr find 1 ,
+.Xr mv 1 ,
+.Xr vim 1 ,
+.Xr rename 2
+.Sh AUTHORS
+.An Thomas Voss Aq Mt mail@thomasvoss.com
