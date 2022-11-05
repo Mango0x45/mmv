@@ -33,7 +33,7 @@ fn main() -> MainResult {
 fn work() -> Result<(), Error> {
 	let mut argv = env::args().collect::<Vec<String>>();
 	let mut flags = Flags { ..Default::default() };
-	let mut opts = Parser::new(&argv, ":0a");
+	let mut opts = Parser::new(&argv, ":0ei");
 
 	loop {
 		match opts.next().transpose() {
@@ -54,12 +54,16 @@ fn work() -> Result<(), Error> {
 	let cmd  = rest.get(0).ok_or(Error::BadArgs)?;
 	let args = &rest[1..];
 
-	let old_files: Vec<_> = io::stdin()
+	let mut old_files: Vec<_> = io::stdin()
 		.lines()
 		.collect::<Result<_, _>>()
 		.unwrap();
 	if old_files.iter().any(|s| s.is_empty()) {
 		return Err(Error::BadArgs);
+	}
+
+	if flags.encode {
+		old_files = old_files.iter().map(move |s| encode_string(s)).collect();
 	}
 
 	let dups = duplicate_elements(old_files.clone());
@@ -86,7 +90,11 @@ fn work() -> Result<(), Error> {
 
 	let new_files = String::from_utf8(output.stdout)?
 		.lines()
-		.map(|s| s.to_string())
+		.map(|s| if flags.encode {
+			decode_string(s)
+		} else {
+			s.to_string()
+		})
 		.collect::<Vec<String>>();
 
 	if old_files.len() != new_files.len() {
@@ -126,15 +134,18 @@ where
 		.collect::<Vec<_>>()
 }
 
-fn encode_to_file<W: Write>(f: &mut W, s: &str) -> io::Result<()> {
-	s.chars().try_for_each(|c| {
-		write!(f, "{}", match c {
-			'\\' => "\\\\",
-			'\n' => "\\n",
-			_ => return write!(f, "{}", c),
-		})
-	})?;
-	write!(f, "{}", '\n')
+fn encode_string(s: &str) -> String {
+	let mut n = String::new();
+	s.chars().for_each(|c| match c {
+		'\\' => n.push_str("\\\\"),
+		'\n' => n.push_str("\\n"),
+		_ => n.push(c)
+	});
+	n
+}
+
+fn decode_string(s: &str) -> String {
+	(EncodedString { s: s.bytes() }).decode()
 }
 
 fn decode_from_file(tmpfile: &NamedTempFile) -> Result<Vec<String>, io::Error> {
