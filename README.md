@@ -1,10 +1,24 @@
+# NOTE FOR USERS THAT WANT TO TRY THIS OUT!
+
+The current code on the master branch doesn’t work as documented, as a newer
+more powerful interface is being developed.  For the doucmented interface, you
+want to build the latest stable tag:
+
+```console
+$ git clone <clone url>
+$ cd mmv
+$ git checkout tags/v1.0.0 -b v1.0.0-master
+$ cargo build -r
+$ make install
+```
+
 # mmv — multi move
 
 `mmv` is a command-line utility to move multiple files in a more convenient
 manner than for-loops.  The best way to explain this is with an example.  Say
 you had the following files in the current directory:
 
-```sh
+```console
 $ ls
 'The Fellowship of the Ring.mp4'  'The Two Towers.mp4'
 'The Return of the King.mp4'
