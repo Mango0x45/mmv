@@ -33,14 +33,15 @@ fn work() -> Result<(), Error> {
 	// TODO: Don't allocate the arguments in a Vec!
 	let argv = env::args().collect::<Vec<String>>();
 	let mut flags = Flags::default();
-	let mut opts = Parser::new(&argv, ":0ei");
+	let mut opts = Parser::new(&argv, ":0eiv");
 
 	// TODO: Perhaps implement FromIterator for Flags?
 	opts.by_ref().map(Result::ok).try_for_each(|o| Some(match o? {
-		Opt('0', None) => flags.nul = true,
-		Opt('e', None) => flags.encode = true,
+		Opt('0', None) => flags.nul        = true,
+		Opt('e', None) => flags.encode     = true,
 		Opt('i', None) => flags.individual = true,
-		_ => return None,
+		Opt('v', None) => flags.verbose    = true,
+		_              => return None,
 	})).ok_or(Error::BadArgs)?;
 
 	let (cmd, args) = argv[opts.index()..].split_first()
@@ -93,8 +94,8 @@ fn work() -> Result<(), Error> {
 
 	iter::zip(old_files.iter(), new_files.iter())
 		.filter(|(x, y)| x != y)
-		.try_for_each(|(x, y)| try_move(&mut conflicts, &tmpdir, x, y))?;
-	conflicts.iter().try_for_each(|c| do_move(&tmpdir, c))?;
+		.try_for_each(|(x, y)| try_move(&mut conflicts, &flags, &tmpdir, x, y))?;
+	conflicts.iter().try_for_each(|c| do_move(&flags, &tmpdir, c))?;
 
 	Ok(())
 }
@@ -184,22 +185,32 @@ fn decode_from_file(tmpfile: &NamedTempFile) -> Result<Vec<String>, Error> {
 
 fn try_move<'a>(
 	conflicts: &mut Vec<&'a str>,
+	flags: &Flags,
 	tmpdir: &TempDir,
 	old: &str,
 	new: &'a str
 ) -> Result<(), io::Error> {
 	if Path::new(new).exists() {
 		let new_loc = tmpdir.path().to_str().unwrap().to_owned() + "/" + new;
-		fs::rename(old, new_loc)?;
+		fs::rename(old, &new_loc)?;
+		if flags.verbose {
+			eprintln!("renamed '{old}' -> '{new_loc}'");
+		}
 		conflicts.push(new);
 	} else {
 		fs::rename(old, new)?;
+		if flags.verbose {
+			eprintln!("renamed '{old}' -> '{new}'");
+		}
 	}
 	Ok(())
 }
 
-fn do_move(tmpdir: &TempDir, new: &str) -> Result<(), io::Error> {
+fn do_move(flags: &Flags, tmpdir: &TempDir, new: &str) -> Result<(), io::Error> {
 	let old = tmpdir.path().to_str().unwrap().to_owned() + "/" + new;
-	fs::rename(old, new)?;
+	fs::rename(&old, new)?;
+	if flags.verbose {
+		eprintln!("renamed '{old}' -> '{new}'");
+	}
 	Ok(())
 }

@@ -2,7 +2,8 @@
 pub struct Flags {
 	pub encode: bool,
 	pub individual: bool,
-	pub nul: bool
+	pub nul: bool,
+	pub verbose: bool
 }
 
 impl Default for Flags {
@@ -10,7 +11,8 @@ impl Default for Flags {
 		Flags {
 			encode: false,
 			individual: false,
-			nul: false
+			nul: false,
+			verbose: false
 		}
 	}
 }
