@@ -2,7 +2,7 @@ use std::{
 	env,
 	fmt::{self, Display},
 	io,
-	string
+	str,
 };
 
 pub enum Error {
@@ -12,8 +12,9 @@ pub enum Error {
 	DupOutputElems(Vec<String>),
 	IOError(io::Error),
 	Nop,
-	UTF8Error(string::FromUtf8Error),
+	UTF8Error(std::str::Utf8Error),
 	SpawnFailed(String, io::Error),
+	BadDecoding(String),
 }
 
 impl Display for Error {
@@ -31,7 +32,8 @@ impl Display for Error {
 			Self::IOError(e) => writeln!(f, "{p}: {e}"),
 			Self::Nop => Ok(()),
 			Self::UTF8Error(e) => writeln!(f, "{p}: {e}"),
-			Self::SpawnFailed(ed, e) => writeln!(f, "{p}: Failed to spawn editor \"{ed}\": {e}")
+			Self::SpawnFailed(ed, e) => writeln!(f, "{p}: Failed to spawn editor \"{ed}\": {e}"),
+			Self::BadDecoding(s) => writeln!(f, "{p}: Decoding the text {s:?} failed!"),
 		}
 	}
 }
@@ -42,8 +44,8 @@ impl From<io::Error> for Error {
 	}	
 }
 
-impl From<string::FromUtf8Error> for Error {
-	fn from(e: string::FromUtf8Error) -> Self {
+impl From<str::Utf8Error> for Error {
+	fn from(e: str::Utf8Error) -> Self {
 		Self::UTF8Error(e)
 	}
 }

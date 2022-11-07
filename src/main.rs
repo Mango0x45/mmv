@@ -1,20 +1,20 @@
-mod encoded_string;
 mod error;
 mod flags;
 mod main_result;
 
 use std::{
-	collections::HashSet,
+	borrow::Cow,
+	collections::HashMap,
 	env,
 	fs,
 	hash::Hash,
 	io::{self, BufRead, BufReader, Write},
+	iter,
 	path::Path,
 	process::{Command, Stdio}
 };
 
 use {
-	encoded_string::EncodedString,
 	error::Error,
 	main_result::MainResult
 };
@@ -22,7 +22,6 @@ use {
 use {
 	flags::Flags,
 	getopt::{Opt, Parser},
-	itertools::Itertools,
 	tempfile::{Builder, NamedTempFile, TempDir}
 };
 
@@ -31,45 +30,31 @@ fn main() -> MainResult {
 }
 
 fn work() -> Result<(), Error> {
-	let mut argv = env::args().collect::<Vec<String>>();
-	let mut flags = Flags { ..Default::default() };
+	// TODO: Don't allocate the arguments in a Vec!
+	let argv = env::args().collect::<Vec<String>>();
+	let mut flags = Flags::default();
 	let mut opts = Parser::new(&argv, ":0ei");
 
-	loop {
-		match opts.next().transpose() {
-			Ok(v) => match v {
-				None => break,
-				Some(opt) => match opt {
-					Opt('0', None) => flags.nul = true,
-					Opt('e', None) => flags.encode = true,
-					Opt('i', None) => flags.individual = true,
-					_ => { return Err(Error::BadArgs); }
-				}
-			},
-			Err(_) => { return Err(Error::BadArgs); }
-		}
-	}
+	// TODO: Perhaps implement FromIterator for Flags?
+	opts.by_ref().map(Result::ok).try_for_each(|o| Some(match o? {
+		Opt('0', None) => flags.nul = true,
+		Opt('e', None) => flags.encode = true,
+		Opt('i', None) => flags.individual = true,
+		_ => return None,
+	})).ok_or(Error::BadArgs)?;
 
-	let rest = argv.split_off(opts.index());
-	let cmd  = rest.get(0).ok_or(Error::BadArgs)?;
-	let args = &rest[1..];
+	let (cmd, args) = argv[opts.index()..].split_first()
+		.ok_or(Error::BadArgs)?;
 
-	let mut old_files: Vec<_> = io::stdin()
-		.lines()
-		.collect::<Result<_, _>>()
-		.unwrap();
-	if old_files.iter().any(|s| s.is_empty()) {
-		return Err(Error::BadArgs);
-	}
+	let old_files = io::stdin().lines()
+		.map(|l| l.map_err(Error::from)
+			 .and_then(|l| if l.is_empty() { Err(Error::BadArgs) } else { Ok(l) })
+			 .map(|l| encode_string(&l)))
+		.collect::<Result<Vec<String>, Error>>()?;
 
-	if flags.encode {
-		old_files = old_files.iter().map(move |s| encode_string(s)).collect();
-	}
-
-	let dups = duplicate_elements(old_files.clone());
-	if !dups.is_empty() {
-		return Err(Error::DupInputElems(dups));
-	}
+	duplicate_elements(old_files.iter()).map_or(Ok(()), |dups| {
+		Err(Error::DupInputElems(dups.cloned().collect()))
+	})?;
 
 	let mut child = Command::new(cmd)
 		.args(args)
@@ -78,91 +63,123 @@ fn work() -> Result<(), Error> {
 		.spawn()
 		.map_err(|e| Error::SpawnFailed(cmd.to_owned(), e))?;
 
-	{
-		let mut stdin = child.stdin.take().expect("Failed to open stdin");
-		old_files.iter().try_for_each(|f| writeln!(stdin, "{f}"))?;
-	}
+	// TODO: Don’t use expect, create a custom error for this
+	child.stdin.take().map(|mut stdin| {
+		old_files.iter().try_for_each(|f| writeln!(stdin, "{f}"))
+	}).expect("Failed to open child stdin")?;
 
-	let output = child.wait_with_output()?;
-	if !output.status.success() {
-		return Err(Error::Nop);
-	}
+	// On failure we exit with NOP error, because the expectation is that the process we spawned
+	// that failed will have printed an error message to stderr.
+	let output = child.wait_with_output().map_err(Error::from)
+		.and_then(|o| if o.status.success() { Ok(o) } else { Err(Error::Nop) })?;
 
-	let new_files = String::from_utf8(output.stdout)?
-		.lines()
-		.map(|s| if flags.encode {
-			decode_string(s)
+	let new_files = std::str::from_utf8(&output.stdout)?.lines()
+		.map(|s| Ok(if flags.encode {
+			Cow::Owned(decode_string(Cow::Borrowed(s))?)
 		} else {
-			s.to_string()
-		})
-		.collect::<Vec<String>>();
+			Cow::Borrowed(s)
+		})).collect::<Result<Vec<Cow<'_, str>>, Error>>()?;
 
 	if old_files.len() != new_files.len() {
 		return Err(Error::BadLengths);
 	}
 
-	let dups = duplicate_elements(new_files.iter().cloned().collect::<Vec<_>>());
-	if !dups.is_empty() {
-		return Err(Error::DupOutputElems(dups));
-	}
+	duplicate_elements(new_files.iter()).map_or(Ok(()), |dups| {
+		Err(Error::DupOutputElems(dups.map(|d| d.to_string()).collect()))
+	})?;
 
 	let tmpdir = Builder::new().prefix("mmv").tempdir()?;
 	let mut conflicts = Vec::<&str>::new();
 
-	old_files
-		.iter()
-		.zip(new_files.iter())
+	iter::zip(old_files.iter(), new_files.iter())
 		.filter(|(x, y)| x != y)
 		.try_for_each(|(x, y)| try_move(&mut conflicts, &tmpdir, x, y))?;
-	conflicts
-		.iter()
-		.try_for_each(|c| do_move(&tmpdir, c))?;
+	conflicts.iter().try_for_each(|c| do_move(&tmpdir, c))?;
 
 	Ok(())
 }
 
-fn duplicate_elements<T>(iter: T) -> Vec<T::Item>
+fn duplicate_elements<T>(iter: T) -> Option<impl Iterator<Item = T::Item>>
 where
 	T: IntoIterator,
-	T::Item: Clone + Eq + Hash
+	T::Item: Eq + Hash
 {
-	let mut uniq = HashSet::new();
-	iter
-		.into_iter()
-		.filter(|x| !uniq.insert(x.clone()))
-		.unique()
-		.collect::<Vec<_>>()
+	let mut elems: HashMap<T::Item, bool> = HashMap::new();
+	let mut fail = false;
+
+	for elem in iter.into_iter() {
+		elems.entry(elem)
+			.and_modify(|b| { *b = true; fail = true; })
+			.or_insert(false);
+	}
+
+	fail.then(|| elems.into_iter().filter_map(|(e, b)| b.then_some(e)))
 }
 
 fn encode_string(s: &str) -> String {
-	let mut n = String::new();
-	s.chars().for_each(|c| match c {
-		'\\' => n.push_str("\\\\"),
-		'\n' => n.push_str("\\n"),
-		_ => n.push(c)
-	});
-	n
+	s.chars().flat_map(|c| {
+		let cs = match c {
+			'\\' => ['\\', '\\'],
+			'\n' => ['\\', 'n' ],
+			_    => [c,    '\0'],
+		};
+		cs.into_iter().enumerate()
+			.filter(|(i, c)| *i != 1 || *c != '\0')
+			.map(|(_, c)| c)
+	}).collect::<String>()
 }
 
-fn decode_string(s: &str) -> String {
-	(EncodedString { s: s.bytes() }).decode()
+fn decode_string(s: Cow<'_, str>) -> Result<String, Error> {
+	let mut pv = false;
+	let mut fail = false;
+
+	match s {
+		Cow::Owned(s) => {
+			let bs = s.as_bytes();
+			bs.iter().for_each(|b| match (pv, *b) {
+				(true, b'\\') => pv = false,
+				(true, b'n')  => pv = false,
+				(true, _)	 => { pv = false; fail = true },
+				(false, b'\\') => pv = true,
+				(false, _) => {},
+			});
+
+			if fail || pv {
+				return Err(Error::BadDecoding(s.to_string()));
+			}
+
+			let mut bs = s.into_bytes();
+			bs.retain_mut(|b| match (pv, *b) {
+				(true, b'\\') => { pv = false; true },
+				(true, b'n')  => { pv = false; *b = b'\n'; true },
+				(true, _)	 => unreachable!(),
+				(false, b'\\') => { pv = true; false },
+				(false, _) => true,
+			});
+
+			Ok(String::from_utf8(bs).unwrap())
+		},
+
+		Cow::Borrowed(s) => {
+			s.chars()
+				.map(|c| Ok(match (pv, c) {
+					(true, '\\')  => { pv = false; Some('\\') },
+					(true, 'n')   => { pv = false; Some('\n') },
+					(true, _)	 => { pv = false; return Err(()); },
+					(false, '\\') => { pv = true;  None },
+					(false, _)	=> { Some(c) } }))
+				.filter_map(Result::transpose)
+				.collect::<Result<String, ()>>()
+				.map_err(|()| Error::BadDecoding(s.to_string()))
+		},
+	}
 }
 
-fn decode_from_file(tmpfile: &NamedTempFile) -> Result<Vec<String>, io::Error> {
-	BufReader::new(tmpfile)
-		.lines()
-		.map(|r| match r {
-			Ok(s) => {
-				let es = EncodedString { s: s.bytes() };
-				Ok(es.decode())
-			},
-			Err(_) => r
-		})
-		.filter(|r| match r {
-			Ok(s) => !s.is_empty(),
-			_ => true
-		})
-		.collect::<Result<Vec<String>, _>>()
+fn decode_from_file(tmpfile: &NamedTempFile) -> Result<Vec<String>, Error> {
+	BufReader::new(tmpfile).lines()
+		.map(|l| l.map_err(Error::from).and_then(|l| decode_string(Cow::Owned(l))))
+		.filter(|s| s.as_ref().map_or(true, |s| !s.is_empty()))
+		.collect()
 }
 
 fn try_move<'a>(
