@@ -49,8 +49,7 @@ fn work() -> Result<(), Error> {
 
 	let old_files = io::stdin().lines()
 		.map(|l| l.map_err(Error::from)
-			 .and_then(|l| if l.is_empty() { Err(Error::BadArgs) } else { Ok(l) })
-			 .map(|l| encode_string(&l)))
+			 .and_then(|l| if l.is_empty() { Err(Error::BadArgs) } else { Ok(l) }))
 		.collect::<Result<Vec<String>, Error>>()?;
 
 	duplicate_elements(old_files.iter()).map_or(Ok(()), |dups| {
@@ -66,7 +65,13 @@ fn work() -> Result<(), Error> {
 
 	// TODO: Don’t use expect, create a custom error for this
 	child.stdin.take().map(|mut stdin| {
-		old_files.iter().try_for_each(|f| writeln!(stdin, "{f}"))
+		old_files.iter().try_for_each(|f|
+			if flags.encode {
+				writeln!(stdin, "{}", encode_string(&f))
+			} else {
+				writeln!(stdin, "{f}")
+			}
+		)
 	}).expect("Failed to open child stdin")?;
 
 	// On failure we exit with NOP error, because the expectation is that the process we spawned
@@ -121,6 +126,7 @@ fn encode_string(s: &str) -> String {
 	s.chars().flat_map(|c| {
 		let cs = match c {
 			'\\' => ['\\', '\\'],
+			'\t' => ['\\', 't' ],
 			'\n' => ['\\', 'n' ],
 			_    => [c,    '\0'],
 		};
@@ -138,11 +144,12 @@ fn decode_string(s: Cow<'_, str>) -> Result<String, Error> {
 		Cow::Owned(s) => {
 			let bs = s.as_bytes();
 			bs.iter().for_each(|b| match (pv, *b) {
-				(true, b'\\') => pv = false,
-				(true, b'n')  => pv = false,
-				(true, _)	 => { pv = false; fail = true },
+				(true, b'\\')  => pv = false,
+				(true, b'n')   => pv = false,
+				(true, b't')   => pv = false,
+				(true, _)	   => { pv = false; fail = true },
 				(false, b'\\') => pv = true,
-				(false, _) => {},
+				(false, _)     => {},
 			});
 
 			if fail || pv {
@@ -151,11 +158,12 @@ fn decode_string(s: Cow<'_, str>) -> Result<String, Error> {
 
 			let mut bs = s.into_bytes();
 			bs.retain_mut(|b| match (pv, *b) {
-				(true, b'\\') => { pv = false; true },
-				(true, b'n')  => { pv = false; *b = b'\n'; true },
-				(true, _)	 => unreachable!(),
+				(true, b'\\')  => { pv = false; true },
+				(true, b'n')   => { pv = false; *b = b'\n'; true },
+				(true, b't')   => { pv = false; *b = b'\t'; true },
+				(true, _)	   => unreachable!(),
 				(false, b'\\') => { pv = true; false },
-				(false, _) => true,
+				(false, _)     => true,
 			});
 
 			Ok(String::from_utf8(bs).unwrap())
@@ -166,9 +174,11 @@ fn decode_string(s: Cow<'_, str>) -> Result<String, Error> {
 				.map(|c| Ok(match (pv, c) {
 					(true, '\\')  => { pv = false; Some('\\') },
 					(true, 'n')   => { pv = false; Some('\n') },
-					(true, _)	 => { pv = false; return Err(()); },
+					(true, 't')   => { pv = false; Some('\t') },
+					(true, _)	  => { pv = false; return Err(()); },
 					(false, '\\') => { pv = true;  None },
-					(false, _)	=> { Some(c) } }))
+					(false, _)	  => { Some(c) }
+				}))
 				.filter_map(Result::transpose)
 				.collect::<Result<String, ()>>()
 				.map_err(|()| Error::BadDecoding(s.to_string()))
