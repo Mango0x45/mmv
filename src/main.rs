@@ -95,12 +95,10 @@ fn work() -> Result<(), Error> {
 	})?;
 
 	let tmpdir = Builder::new().prefix("mmv").tempdir()?;
-	let mut conflicts = Vec::<&str>::new();
-
-	iter::zip(old_files.iter(), new_files.iter())
+	let map = iter::zip(old_files.into_iter(), new_files.into_iter())
 		.filter(|(x, y)| x != y)
-		.try_for_each(|(x, y)| try_move(&mut conflicts, &flags, &tmpdir, x, y))?;
-	conflicts.iter().try_for_each(|c| do_move(&flags, &tmpdir, c))?;
+		.collect();
+	move_files(&flags, tmpdir, map);
 
 	Ok(())
 }
@@ -193,34 +191,48 @@ fn decode_from_file(tmpfile: &NamedTempFile) -> Result<Vec<String>, Error> {
 		.collect()
 }
 
-fn try_move<'a>(
-	conflicts: &mut Vec<&'a str>,
-	flags: &Flags,
-	tmpdir: &TempDir,
-	old: &str,
-	new: &'a str
-) -> Result<(), io::Error> {
-	if Path::new(new).exists() {
-		let new_loc = tmpdir.path().to_str().unwrap().to_owned() + "/" + new;
-		fs::rename(old, &new_loc)?;
-		if flags.verbose {
-			eprintln!("renamed '{old}' -> '{new_loc}'");
-		}
-		conflicts.push(new);
-	} else {
-		fs::rename(old, new)?;
-		if flags.verbose {
-			eprintln!("renamed '{old}' -> '{new}'");
-		}
-	}
-	Ok(())
+struct QueuedMove {
+	from: &String,
+	to: &String
 }
 
-fn do_move(flags: &Flags, tmpdir: &TempDir, new: &str) -> Result<(), io::Error> {
-	let old = tmpdir.path().to_str().unwrap().to_owned() + "/" + new;
-	fs::rename(&old, new)?;
-	if flags.verbose {
-		eprintln!("renamed '{old}' -> '{new}'");
+// TODO: This entire function suffers terrible from TOCTTOU problems
+fn move_files(
+	flags: &Flags,
+	dir: TempDir,
+	map: HashMap<String, Cow<'_, str>>
+) -> Result<(), Error> {
+	// TODO: Do we want capacities this large?  Could maybe get quite big?
+	let mut pass1 = Vec::with_capacity(map.len());
+	let mut pass2 = Vec::with_capacity(map.len());
+
+	// TODO: We can try to be smart here, and save on syscalls depending on the orderings of
+	// renamings
+	for (old, new) in map.iter() {
+		if !Path::new(&new).exists() {
+			pass1.push(QueuedMove { from: old, to: new });
+		} else if map.contains_key(&new) {
+			// If we want to rename a -> b and b exists but is itself going to be renamed to
+			// something else, we need to have an intermediate step so we end up doing a -> c -> b.
+			let int = dir.path().join(new);
+			pass1.push(QueuedMove { from: old, to: int });
+			pass2.push(QueuedMove { from: int, to: new });
+		} else {
+			// This occurs when we want to rename a -> b, but b exists and it not itself being
+			// renamed.  In the future a force flag (-f) would allow you to overwrite these
+			// unrelated files.
+			return Err(Error::FileExists(new));
+		}
 	}
+
+	iter::chain(pass1.iter(), pass2.iter())
+		.try_for_each(|qm| {
+			fs::rename(qm.from, qm.to);
+			if flags.verbose {
+				eprintln!("renamed '{qm.from}' -> '{qm.to}'");
+			}
+			Ok(())
+		})?;
+
 	Ok(())
 }
