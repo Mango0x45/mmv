@@ -162,13 +162,14 @@ impl<'a> Move<'a> {
 		let (mut root, mut leaf) = (0, 0);
 
 		// Find the last existing node along the path.
-		let mut parts = path.components();
-		while let Some(part) = parts.next() {
+		let mut parts = path.components().peekable();
+		while let Some(part) = parts.peek() {
 			let node = unsafe { &mut *data.get_unchecked_mut(root).full };
-			if let Some(next) = node.kids.get_mut(&part).copied() {
+			if let Some(next) = node.kids.get_mut(part).copied() {
+				let _ = parts.next();
 				leaf = next; root = next;
 			} else {
-				break
+				break;
 			}
 		}
 
