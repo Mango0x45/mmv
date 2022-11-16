@@ -2,15 +2,17 @@ use std::{
 	env,
 	fmt::{self, Display},
 	io,
+	path::PathBuf,
 	str,
 };
+
+use mmv::ConsError;
 
 pub enum Error {
 	BadArgs,
 	BadDecoding(String),
 	BadLengths,
-	DupInputElems(Vec<String>),
-	DupOutputElems(Vec<String>),
+	ConsError(ConsError<PathBuf>),
 	FileExists(String),
 	IOError(io::Error),
 	Nop,
@@ -25,18 +27,19 @@ impl Display for Error {
 			Self::BadArgs => writeln!(f, "Usage: {p} [-0ei] [--] utility [argument ...]"),
 			Self::BadDecoding(s) => writeln!(f, "{p}: Decoding the text {s:?} failed!"),
 			Self::BadLengths => writeln!(f, "{p}: Files have been added or removed during editing"),
-			Self::DupInputElems(ds) => ds.iter().try_for_each(
-				|d| writeln!(f, "{p}: Multiple input files named \"{}\" specified", d)
-			),
-			Self::DupOutputElems(ds) => ds.iter().try_for_each(
-				|d| writeln!(f, "{p}: Multiple output files named \"{}\" specified", d)
-			),
+			Self::ConsError(e) => writeln!(f, "{p}: The move set could not be constructed: {e}"),
 			Self::FileExists(s) => writeln!(f, "{p}: Attempted to overwrite existing file {s}"),
 			Self::IOError(e) => writeln!(f, "{p}: {e}"),
 			Self::Nop => Ok(()),
 			Self::SpawnFailed(ed, e) => writeln!(f, "{p}: Failed to spawn editor \"{ed}\": {e}"),
 			Self::UTF8Error(e) => writeln!(f, "{p}: {e}"),
 		}
+	}
+}
+
+impl From<ConsError<PathBuf>> for Error {
+	fn from(e: ConsError<PathBuf>) -> Self {
+		Self::ConsError(e)
 	}
 }
 

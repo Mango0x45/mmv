@@ -4,11 +4,8 @@ mod main_result;
 
 use std::{
 	borrow::Cow,
-	collections::HashMap,
 	env,
-	fs,
-	hash::Hash,
-	io::{self, BufRead, BufReader, Write},
+	io::{self, BufRead, BufReader, Write, BufWriter},
 	iter,
 	path::Path,
 	process::{Command, Stdio}
@@ -25,6 +22,8 @@ use {
 	tempfile::{Builder, NamedTempFile, TempDir}
 };
 
+use mmv::{ConsError, Move};
+
 fn main() -> MainResult {
 	work().into()
 }
@@ -37,87 +36,72 @@ fn work() -> Result<(), Error> {
 
 	// TODO: Perhaps implement FromIterator for Flags?
 	opts.by_ref().map(Result::ok).try_for_each(|o| Some(match o? {
-		Opt('0', None) => flags.nul        = true,
-		Opt('e', None) => flags.encode     = true,
+		Opt('0', None) => flags.nul		   = true,
+		Opt('e', None) => flags.encode	   = true,
 		Opt('i', None) => flags.individual = true,
 		Opt('v', None) => flags.verbose    = true,
-		_              => return None,
+		_			   => return None,
 	})).ok_or(Error::BadArgs)?;
 
 	let (cmd, args) = argv[opts.index()..].split_first()
 		.ok_or(Error::BadArgs)?;
 
-	let old_files = io::stdin().lines()
-		.map(|l| l.map_err(Error::from)
-			 .and_then(|l| if l.is_empty() { Err(Error::BadArgs) } else { Ok(l) }))
+	// Collect source paths from standard input.
+	let srcs = io::stdin().lines()
+		.map(|l| l.map_err(Error::from).and_then(|l|
+			if l.is_empty() { Err(Error::BadArgs) } else { Ok(l) }))
 		.collect::<Result<Vec<String>, Error>>()?;
 
-	duplicate_elements(old_files.iter()).map_or(Ok(()), |dups| {
-		Err(Error::DupInputElems(dups.cloned().collect()))
-	})?;
-
-	let mut child = Command::new(cmd)
-		.args(args)
-		.stdin(Stdio::piped())
-		.stdout(Stdio::piped())
-		.spawn()
+	// Launch the child process.
+	let mut child = Command::new(cmd).args(args)
+		.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
 		.map_err(|e| Error::SpawnFailed(cmd.to_owned(), e))?;
 
+	// Pass the source file list to the process.
 	// TODO: Don’t use expect, create a custom error for this
-	child.stdin.take().map(|mut stdin| {
-		old_files.iter().try_for_each(|f|
+	{
+		let ci = child.stdin.take().expect("Could not open the child process' stdin.");
+		let mut ci = BufWriter::new(ci);
+		for src in srcs.iter() {
 			if flags.encode {
-				writeln!(stdin, "{}", encode_string(&f))
+				writeln!(ci, "{}", encode_string(&src))?;
 			} else {
-				writeln!(stdin, "{f}")
+				writeln!(ci, "{}", src)?;
 			}
-		)
-	}).expect("Failed to open child stdin")?;
-
-	// On failure we exit with NOP error, because the expectation is that the process we spawned
-	// that failed will have printed an error message to stderr.
-	let output = child.wait_with_output().map_err(Error::from)
-		.and_then(|o| if o.status.success() { Ok(o) } else { Err(Error::Nop) })?;
-
-	let new_files = std::str::from_utf8(&output.stdout)?.lines()
-		.map(|s| Ok(if flags.encode {
-			Cow::Owned(decode_string(Cow::Borrowed(s))?)
-		} else {
-			Cow::Borrowed(s)
-		})).collect::<Result<Vec<Cow<'_, str>>, Error>>()?;
-
-	if old_files.len() != new_files.len() {
-		return Err(Error::BadLengths);
+		}
 	}
 
-	duplicate_elements(new_files.iter()).map_or(Ok(()), |dups| {
-		Err(Error::DupOutputElems(dups.map(|d| d.to_string()).collect()))
-	})?;
+	// Read the destination file list from the process.
+	let mut dsts = Vec::with_capacity(srcs.len());
+	{
+		let co = child.stdout.take().expect("Could not open the child process' stdout.");
+		let co = BufReader::new(co);
+		// TODO: Don't allocate an intermediary String per line, by using the BufReader buffer.
+		co.lines().try_for_each(|dst| {
+			if dsts.len() == srcs.len() { return Err(Error::BadLengths); }
+			if flags.encode {
+				dsts.push(decode_string(Cow::Owned(dst?))?);
+			} else {
+				dsts.push(dst?);
+			}
+			Ok(())
+		})?;
 
-	let tmpdir = Builder::new().prefix("mmv").tempdir()?;
-	let map = iter::zip(old_files.into_iter(), new_files.into_iter())
-		.filter(|(x, y)| x != y)
-		.collect();
-	move_files(&flags, tmpdir, map);
+		if dsts.len() != srcs.len() { return Err(Error::BadLengths); }
+	}
+
+	// If the process failed, it is expected to print an error message; as such, we exit directly.
+	if !child.wait()?.success() { return Err(Error::Nop); }
+
+	// Set up the move.
+	let this = Move::new();
+	ConsError::from_iter(iter::zip(srcs.iter(), dsts.iter())
+		.filter_map(|(src, dst)| this.add(src.as_ref(), dst.as_ref()).err())
+		.map(|err| err.map_paths(Path::to_path_buf)))?;
+
+	// TODO: Execute the move.
 
 	Ok(())
-}
-
-fn duplicate_elements<T>(iter: T) -> Option<impl Iterator<Item = T::Item>>
-where
-	T: IntoIterator,
-	T::Item: Eq + Hash
-{
-	let mut elems: HashMap<T::Item, bool> = HashMap::new();
-	let mut fail = false;
-
-	for elem in iter.into_iter() {
-		elems.entry(elem)
-			.and_modify(|b| { *b = true; fail = true; })
-			.or_insert(false);
-	}
-
-	fail.then(|| elems.into_iter().filter_map(|(e, b)| b.then_some(e)))
 }
 
 fn encode_string(s: &str) -> String {
@@ -126,7 +110,7 @@ fn encode_string(s: &str) -> String {
 			'\\' => ['\\', '\\'],
 			'\t' => ['\\', 't' ],
 			'\n' => ['\\', 'n' ],
-			_    => [c,    '\0'],
+			_	 => [c,    '\0'],
 		};
 		cs.into_iter().enumerate()
 			.filter(|(i, c)| *i != 1 || *c != '\0')
@@ -147,7 +131,7 @@ fn decode_string(s: Cow<'_, str>) -> Result<String, Error> {
 				(true, b't')   => pv = false,
 				(true, _)	   => { pv = false; fail = true },
 				(false, b'\\') => pv = true,
-				(false, _)     => {},
+				(false, _)	   => {},
 			});
 
 			if fail || pv {
@@ -161,7 +145,7 @@ fn decode_string(s: Cow<'_, str>) -> Result<String, Error> {
 				(true, b't')   => { pv = false; *b = b'\t'; true },
 				(true, _)	   => unreachable!(),
 				(false, b'\\') => { pv = true; false },
-				(false, _)     => true,
+				(false, _)	   => true,
 			});
 
 			Ok(String::from_utf8(bs).unwrap())
@@ -189,50 +173,4 @@ fn decode_from_file(tmpfile: &NamedTempFile) -> Result<Vec<String>, Error> {
 		.map(|l| l.map_err(Error::from).and_then(|l| decode_string(Cow::Owned(l))))
 		.filter(|s| s.as_ref().map_or(true, |s| !s.is_empty()))
 		.collect()
-}
-
-struct QueuedMove {
-	from: &String,
-	to: &String
-}
-
-// TODO: This entire function suffers terrible from TOCTTOU problems
-fn move_files(
-	flags: &Flags,
-	dir: TempDir,
-	map: HashMap<String, Cow<'_, str>>
-) -> Result<(), Error> {
-	// TODO: Do we want capacities this large?  Could maybe get quite big?
-	let mut pass1 = Vec::with_capacity(map.len());
-	let mut pass2 = Vec::with_capacity(map.len());
-
-	// TODO: We can try to be smart here, and save on syscalls depending on the orderings of
-	// renamings
-	for (old, new) in map.iter() {
-		if !Path::new(&new).exists() {
-			pass1.push(QueuedMove { from: old, to: new });
-		} else if map.contains_key(&new) {
-			// If we want to rename a -> b and b exists but is itself going to be renamed to
-			// something else, we need to have an intermediate step so we end up doing a -> c -> b.
-			let int = dir.path().join(new);
-			pass1.push(QueuedMove { from: old, to: int });
-			pass2.push(QueuedMove { from: int, to: new });
-		} else {
-			// This occurs when we want to rename a -> b, but b exists and it not itself being
-			// renamed.  In the future a force flag (-f) would allow you to overwrite these
-			// unrelated files.
-			return Err(Error::FileExists(new));
-		}
-	}
-
-	iter::chain(pass1.iter(), pass2.iter())
-		.try_for_each(|qm| {
-			fs::rename(qm.from, qm.to);
-			if flags.verbose {
-				eprintln!("renamed '{qm.from}' -> '{qm.to}'");
-			}
-			Ok(())
-		})?;
-
-	Ok(())
 }
