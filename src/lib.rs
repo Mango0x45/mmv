@@ -11,14 +11,16 @@
 //!
 //! Copyright 2022 The Depressed Milkman
 
-use std::borrow::Borrow;
-use std::cell::Cell;
-use std::collections::HashMap;
-use std::fmt::{self, Display};
-use std::iter::Extend;
-use std::mem::ManuallyDrop;
-use std::num::NonZeroUsize;
-use std::path::{Component, Path};
+use std::{
+	borrow::Borrow,
+	cell::Cell,
+	collections::HashMap,
+	fmt::{self, Display},
+	iter::Extend,
+	mem::ManuallyDrop,
+	num::NonZeroUsize,
+	path::{Component, Path}
+};
 
 /// A batched move.
 ///
