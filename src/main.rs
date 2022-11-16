@@ -4,6 +4,7 @@ mod main_result;
 use std::{
 	borrow::Cow,
 	env,
+	ffi::OsString,
 	io::{self, BufRead, BufReader, Write, BufWriter},
 	iter,
 	path::Path,
@@ -16,10 +17,7 @@ use {
 	mmv::{ConsError, Move}
 };
 
-use {
-	getopt::{Opt, Parser},
-	tempfile::{Builder, NamedTempFile, TempDir}
-};
+use tempfile::{Builder, NamedTempFile, TempDir};
 
 #[derive(Default)]
 struct Flags {
@@ -34,27 +32,13 @@ fn main() -> MainResult {
 }
 
 fn work() -> Result<(), Error> {
-	// TODO: Don't allocate the arguments in a Vec!
-	let argv = env::args().collect::<Vec<String>>();
-	let mut flags = Flags::default();
-	let mut opts = Parser::new(&argv, ":0eiv");
-
-	// TODO: Perhaps implement FromIterator for Flags?
-	opts.by_ref().map(Result::ok).try_for_each(|o| Some(match o? {
-		Opt('0', None) => flags.nul		   = true,
-		Opt('e', None) => flags.encode	   = true,
-		Opt('i', None) => flags.individual = true,
-		Opt('v', None) => flags.verbose    = true,
-		_			   => return None,
-	})).ok_or(Error::BadArgs)?;
-
-	let (cmd, args) = argv[opts.index()..].split_first()
-		.ok_or(Error::BadArgs)?;
+	let (flags, rest) = parse_args()?;
+	let (cmd, args) = rest.split_first().ok_or(Error::BadArgs(None))?;
 
 	// Collect source paths from standard input.
 	let srcs = io::stdin().lines()
 		.map(|l| l.map_err(Error::from).and_then(|l|
-			if l.is_empty() { Err(Error::BadArgs) } else { Ok(l) }))
+			if l.is_empty() { Err(Error::BadArgs(None)) } else { Ok(l) }))
 		.collect::<Result<Vec<String>, Error>>()?;
 
 	// Launch the child process.
@@ -107,6 +91,29 @@ fn work() -> Result<(), Error> {
 	// TODO: Execute the move.
 
 	Ok(())
+}
+
+fn parse_args() -> Result<(Flags, Vec<OsString>), lexopt::Error> {
+	use lexopt::prelude::*;
+
+	let mut rest = Vec::with_capacity(env::args().len());
+	let mut flags = Flags::default();
+	let mut parser = lexopt::Parser::from_env();
+	while let Some(arg) = parser.next()? {
+		match arg {
+			Short('0') | Long("nul")        => flags.nul        = true,
+			Short('e') | Long("encode")     => flags.encode     = true,
+			Short('i') | Long("individual") => flags.individual = true,
+			Short('v') | Long("verbose")    => flags.verbose    = true,
+			Value(v) => {
+				rest.push(v);
+				rest.extend(iter::from_fn(|| parser.value().ok()));
+			},
+			_ => return Err(arg.unexpected())
+		}
+	}
+
+	Ok((flags, rest))
 }
 
 fn encode_string(s: &str) -> String {

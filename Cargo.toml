@@ -11,5 +11,5 @@ authors = [
 edition = "2021"
 
 [dependencies]
-getopt = "1.1.3"
+lexopt = "0.1.0"
 tempfile = "3.3.0"
