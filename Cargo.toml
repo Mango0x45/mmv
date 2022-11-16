@@ -1,6 +1,13 @@
 [package]
 name = "mmv"
 version = "1.0.0"
+license = "0BSD"
+description = "Safe batched file moves"
+repository = "https://git.thomasvoss.com/mmv"
+authors = [
+	"Thomas Voss <mail@thomasvoss.com>",
+	"The Depressed Milkman <github@tdmm.eu>"
+]
 edition = "2021"
 
 [dependencies]
