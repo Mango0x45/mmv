@@ -1,5 +1,4 @@
 mod error;
-mod flags;
 mod main_result;
 
 use std::{
@@ -13,16 +12,22 @@ use std::{
 
 use {
 	error::Error,
-	main_result::MainResult
+	main_result::MainResult,
+	mmv::{ConsError, Move}
 };
 
 use {
-	flags::Flags,
 	getopt::{Opt, Parser},
 	tempfile::{Builder, NamedTempFile, TempDir}
 };
 
-use mmv::{ConsError, Move};
+#[derive(Default)]
+struct Flags {
+	pub encode: bool,
+	pub individual: bool,
+	pub nul: bool,
+	pub verbose: bool
+}
 
 fn main() -> MainResult {
 	work().into()
