@@ -46,7 +46,7 @@ impl From<ConsError<PathBuf>> for Error {
 impl From<io::Error> for Error {
 	fn from(e: io::Error) -> Self {
 		Self::IOError(e)
-	}	
+	}
 }
 
 impl From<str::Utf8Error> for Error {

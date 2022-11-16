@@ -1,14 +1,14 @@
 //! # `mmv`: batched file moves
-//! 
+//!
 //! This library provides functionality for moving many filesystem paths simultaneously.  It handles
 //! overlapping source/destination paths gracefully, but is specifically dedicated to moving paths:
 //! it does not support copying a single path to multiple destinations.
-//! 
+//!
 //! The `mmv` program is the main user of this library, and the API provided here is tailored to its
 //! use.
-//! 
+//!
 //! ---
-//! 
+//!
 //! Copyright 2022 The Depressed Milkman
 
 use std::borrow::Borrow;
@@ -21,13 +21,13 @@ use std::num::NonZeroUsize;
 use std::path::{Component, Path};
 
 /// A batched move.
-/// 
+///
 /// An instance of this structure represents a command to simultaneously move a set of source paths
 /// to a set of corresponding destination paths.  After the move finishes, each destination path
 /// will correspond to the source path as it was before the move began.  This means, for example,
 /// that if two paths are being moved to each other, a temporary file will have to be used to move
 /// between them, so that they are swapped without accidentally overwriting one with the other.
-/// 
+///
 /// At the moment, the limitations of the [`std::path`] API mean that it is not possible to store
 /// the heap-allocated memory for the paths used by this structure within it; they can only be used
 /// by reference here, and so have to be stored by the user.  This limitation may be lifted in the
@@ -64,7 +64,7 @@ struct FreeNode {
 }
 
 /// Information about a path involved in a batched move.
-/// 
+///
 /// An instance of this structure is maintained for every path involved in a batched move.	It keeps
 /// track of move-related information about the path, such as its status as a source and/or as a
 /// destination path.
@@ -107,7 +107,7 @@ impl<'a> Move<'a> {
 	}
 
 	/// Add the given source-destination pair to the set.
-	/// 
+	///
 	/// Note that this only requires a shared reference to the set, thereby allowing it to be added
 	/// to from multiple sources concurrently.
 	pub fn add(&self, src: &'a Path, dst: &'a Path) -> Result<(), AddError<&'a Path>> {
@@ -147,7 +147,7 @@ impl<'a> Move<'a> {
 	}
 
 	/// Get the node for the given path, creating it if it does not exist.
-	/// 
+	///
 	/// NOTE: If a Path::iter_prefixes() method is ever introduced, or if path::Ancestors is made a
 	///		  double-ended iteratior, the implementation here can be improved significantly.
 	fn get(data: &mut Vec<Node<'a>>, free: &mut Option<NonZeroUsize>, path: &'a Path) -> usize {
