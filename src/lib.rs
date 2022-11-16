@@ -126,8 +126,11 @@ impl<'a> Move<'a> {
 		// Link src to dst.
 		let src_dst = &mut unsafe { &mut *data.get_unchecked_mut(src_node).full }.info.dst;
 		if let Some(old) = src_dst.as_ref().copied() {
-			return Err(AddError::DupSrc { src, new: dst,
-				old: unsafe { &*data.get_unchecked(old.get()).full }.info.cur });
+			return Err(AddError::DupSrc {
+				src,
+				new: dst,
+				old: unsafe { &*data.get_unchecked(old.get()).full }.info.cur
+			});
 		} else {
 			*src_dst = Some(NonZeroUsize::new(dst_node).unwrap());
 		}
@@ -135,8 +138,11 @@ impl<'a> Move<'a> {
 		// Link dst to src.
 		let dst_src = &mut unsafe { &mut *data.get_unchecked_mut(dst_node).full }.info.src;
 		if let Some(old) = dst_src.as_ref().copied() {
-			return Err(AddError::DupDst { dst, new: src,
-				old: unsafe { &*data.get_unchecked(old.get()).full }.info.cur });
+			return Err(AddError::DupDst {
+				dst,
+				new: src,
+				old: unsafe { &*data.get_unchecked(old.get()).full }.info.cur
+			});
 		} else {
 			*dst_src = Some(NonZeroUsize::new(src_node).unwrap());
 		}
@@ -161,7 +167,9 @@ impl<'a> Move<'a> {
 			let node = unsafe { &mut *data.get_unchecked_mut(root).full };
 			if let Some(next) = node.kids.get_mut(&part).copied() {
 				leaf = next; root = next;
-			} else { break }
+			} else {
+				break
+			}
 		}
 
 		// Construct new nodes for the remainder of the path.
@@ -181,10 +189,16 @@ impl<'a> Move<'a> {
 			// Fill the free node.
 			let first = prev.is_none();
 			node.full = ManuallyDrop::new(FullNode {
-				info: NodeInfo { cur: path, dst: None, src: None },
+				info: NodeInfo {
+					cur: path,
+					dst: None,
+					src: None
+				},
 				kids: prev.into_iter().collect(),
 			});
-			if first { leaf = idx; }
+			if first {
+				leaf = idx;
+			}
 			prev = Some((part, idx));
 		}
 
@@ -200,7 +214,11 @@ impl<'a> Move<'a> {
 
 impl<'a> Default for NodeInfo<'a> {
 	fn default() -> Self {
-		Self { cur: Path::new(""), dst: None, src: None }
+		Self {
+			cur: Path::new(""),
+			dst: None,
+			src: None
+		}
 	}
 }
 
@@ -208,10 +226,16 @@ impl<P: Borrow<Path>> AddError<P> {
 	/// Map all contained paths to a different path type.
 	pub fn map_paths<N: Borrow<Path>, F: FnMut(P) -> N>(self, mut f: F) -> AddError<N> {
 		match self {
-			Self::DupSrc { src, new, old } =>
-				AddError::DupSrc { src: f(src), new: f(new), old: f(old) },
-			Self::DupDst { dst, new, old } =>
-				AddError::DupDst { dst: f(dst), new: f(new), old: f(old) },
+			Self::DupSrc { src, new, old } => AddError::DupSrc {
+				src: f(src),
+				new: f(new),
+				old: f(old)
+			},
+			Self::DupDst { dst, new, old } => AddError::DupDst {
+				dst: f(dst),
+				new: f(new),
+				old: f(old)
+			},
 		}
 	}
 }
@@ -224,9 +248,16 @@ impl<P: Borrow<Path>> ConsError<P> {
 
 	/// Attempt to construct a [`ConsError`] from the given iterator.
 	pub fn from_iter<Iter: IntoIterator<Item = AddError<P>>>(iter: Iter) -> Result<(), Self> {
-		let mut this = Self { dup_srcs: Vec::new(), dup_dsts: Vec::new() };
+		let mut this = Self {
+			dup_srcs: Vec::new(),
+			dup_dsts: Vec::new()
+		};
 		this.extend(iter);
-		if this.is_err() { Err(this) } else { Ok(()) }
+		if this.is_err() {
+			Err(this)
+		} else {
+			Ok(())
+		}
 	}
 }
 

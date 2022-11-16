@@ -42,8 +42,11 @@ fn work() -> Result<(), Error> {
 		.collect::<Result<Vec<String>, Error>>()?;
 
 	// Launch the child process.
-	let mut child = Command::new(cmd).args(args)
-		.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
+	let mut child = Command::new(cmd)
+		.args(args)
+		.stdin(Stdio::piped())
+		.stdout(Stdio::piped())
+		.spawn()
 		.map_err(|e| Error::SpawnFailed(cmd.to_owned(), e))?;
 
 	// Pass the source file list to the process.
@@ -67,7 +70,9 @@ fn work() -> Result<(), Error> {
 		let co = BufReader::new(co);
 		// TODO: Don't allocate an intermediary String per line, by using the BufReader buffer.
 		co.lines().try_for_each(|dst| {
-			if dsts.len() == srcs.len() { return Err(Error::BadLengths); }
+			if dsts.len() == srcs.len() {
+				return Err(Error::BadLengths);
+			}
 			if flags.encode {
 				dsts.push(decode_string(Cow::Owned(dst?))?);
 			} else {
@@ -76,17 +81,23 @@ fn work() -> Result<(), Error> {
 			Ok(())
 		})?;
 
-		if dsts.len() != srcs.len() { return Err(Error::BadLengths); }
+		if dsts.len() != srcs.len() {
+			return Err(Error::BadLengths);
+		}
 	}
 
 	// If the process failed, it is expected to print an error message; as such, we exit directly.
-	if !child.wait()?.success() { return Err(Error::Nop); }
+	if !child.wait()?.success() {
+		return Err(Error::Nop);
+	}
 
 	// Set up the move.
 	let this = Move::new();
-	ConsError::from_iter(iter::zip(srcs.iter(), dsts.iter())
-		.filter_map(|(src, dst)| this.add(src.as_ref(), dst.as_ref()).err())
-		.map(|err| err.map_paths(Path::to_path_buf)))?;
+	ConsError::from_iter(
+		iter::zip(srcs.iter(), dsts.iter())
+			.filter_map(|(src, dst)| this.add(src.as_ref(), dst.as_ref()).err())
+			.map(|err| err.map_paths(Path::to_path_buf))
+	)?;
 
 	// TODO: Execute the move.
 
@@ -124,7 +135,8 @@ fn encode_string(s: &str) -> String {
 			'\n' => ['\\', 'n' ],
 			_	 => [c,    '\0'],
 		};
-		cs.into_iter().enumerate()
+		cs.into_iter()
+			.enumerate()
 			.filter(|(i, c)| *i != 1 || *c != '\0')
 			.map(|(_, c)| c)
 	}).collect::<String>()
