@@ -157,7 +157,7 @@ impl<'a> Move<'a> {
 	/// Get the node for the given path, creating it if it does not exist.
 	///
 	/// NOTE: If a Path::iter_prefixes() method is ever introduced, or if path::Ancestors is made a
-	///		  double-ended iteratior, the implementation here can be improved significantly.
+	///		  double-ended iterator, the implementation here can be improved significantly.
 	fn get(data: &mut Vec<Node<'a>>, free: &mut Option<NonZeroUsize>, path: &'a Path) -> usize {
 		let (mut root, mut leaf) = (0, 0);
 
