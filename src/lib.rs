@@ -59,7 +59,7 @@ struct FullNode<'a> {
 }
 
 /// A free node in a [`Move`].
-#[derive(Default, Copy, Clone)]
+#[derive(Clone, Copy, Default)]
 struct FreeNode {
 	/// The index of the next free node.
 	next: Option<NonZeroUsize>,
