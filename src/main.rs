@@ -54,12 +54,10 @@ fn work() -> Result<(), Error> {
 	{
 		let ci = child.stdin.take().expect("Could not open the child process' stdin.");
 		let mut ci = BufWriter::new(ci);
-		for src in srcs.iter() {
-			if flags.encode {
-				writeln!(ci, "{}", encode_string(&src))?;
-			} else {
-				writeln!(ci, "{}", src)?;
-			}
+		if flags.encode {
+			srcs.iter().try_for_each(|src| writeln!(ci, "{}", encode_string(&src)));
+		} else {
+			srcs.iter().try_for_each(|src| writeln!(ci, "{}", src));
 		}
 	}
 
