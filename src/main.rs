@@ -125,8 +125,7 @@ fn work() -> Result<(), Error> {
 		.collect::<Result<Vec<_>, Error>>()?;
 
 	/* Sort the src/dst pairs so that the sources with the longest componenets
-	 * come first.
-	 */
+	   come first. */
 	src_dst.sort_by_key(|(s, _)| Reverse(s.components().count()));
 
 	let dir = tempdir()?;
