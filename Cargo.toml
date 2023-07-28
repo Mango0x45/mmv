@@ -1,0 +1,14 @@
+[package]
+name = "mmv"
+version = "0.1.0"
+edition = "2021"
+license = "0BSD"
+description = "Move multiple/mapped files"
+repository = "https://git.thomasvoss.com/mmv"
+authors = [
+	"Thomas Voss <mail@thomasvoss.com>",
+]
+
+[dependencies]
+lexopt = "0.1.0"
+tempfile = "3.7.0"
