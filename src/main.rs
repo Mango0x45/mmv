@@ -139,7 +139,7 @@ fn work() -> Result<(), Error> {
 		if flags.dryrun {
 			println!("{} -> {}", s.as_path().display(), dst.as_path().display());
 		} else {
-			fs::rename(s, &dst)?;
+			copy_and_remove_file_or_dir(&s, &dst)?;
 		}
 
 		*s_d = (dst, d.to_path_buf())
@@ -149,7 +149,7 @@ fn work() -> Result<(), Error> {
 		if flags.dryrun {
 			println!("{} -> {}", s.as_path().display(), d.as_path().display());
 		} else {
-			fs::rename(s, d)?;
+			copy_and_remove_file_or_dir(&s, &d)?;
 		}
 	}
 
@@ -252,4 +252,15 @@ fn normalize_path(path: &Path) -> PathBuf {
 		}
 	}
 	ret
+}
+
+fn copy_and_remove_file_or_dir<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> io::Result<()> {
+	let data = fs::metadata(&from)?;
+	if data.is_dir() {
+		fs::create_dir(&to)?;
+		fs::remove_dir(&from)
+	} else {
+		fs::copy(&from, &to)?;
+		fs::remove_file(&from)
+	}
 }
