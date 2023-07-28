@@ -3,14 +3,15 @@ mod main_result;
 
 use std::{
 	cmp::Reverse,
-	collections::{HashSet, hash_map::DefaultHasher},
+	collections::{hash_map::DefaultHasher, HashSet},
 	env,
 	ffi::OsString,
 	fs,
+	hash::{Hash, Hasher},
 	io::{self, BufRead, BufReader, BufWriter, Write},
 	iter,
 	path::{Component, Path, PathBuf},
-	process::{Command, Stdio}, hash::{Hash, Hasher}, fmt::{Display, Formatter, self},
+	process::{Command, Stdio},
 };
 
 use tempfile::tempdir;
