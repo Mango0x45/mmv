@@ -134,17 +134,21 @@ fn work() -> Result<(), Error> {
 	ps.sort_by_key(|s| Reverse(s.0.components().count()));
 
 	for (s, t, _) in ps.iter() {
-		if flags.dryrun {
+		if flags.verbose {
 			println!("{} -> {}", s.as_path().display(), t.as_path().display());
-		} else {
+		}
+
+		if !flags.dryrun {
 			copy_and_remove_file_or_dir(&s, &t)?;
 		}
 	}
 
 	for (_, t, d) in ps.iter().rev() {
-		if flags.dryrun {
+		if flags.verbose {
 			println!("{} -> {}", t.as_path().display(), d.as_path().display());
-		} else {
+		}
+
+		if !flags.dryrun {
 			copy_and_remove_file_or_dir(&t, &d)?;
 		}
 	}
@@ -161,7 +165,10 @@ fn parse_args() -> Result<(Flags, Vec<OsString>), lexopt::Error> {
 	while let Some(arg) = parser.next()? {
 		match arg {
 			Short('0') | Long("nul") => flags.nul = true,
-			Short('d') | Long("dryrun") => flags.dryrun = true,
+			Short('d') | Long("dryrun") => {
+				flags.dryrun = true;
+				flags.verbose = true;
+			},
 			Short('e') | Long("encode") => flags.encode = true,
 			Short('i') | Long("individual") => flags.individual = true,
 			Short('v') | Long("verbose") => flags.verbose = true,
