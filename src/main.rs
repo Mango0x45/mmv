@@ -106,10 +106,11 @@ fn work() -> Result<(), Error> {
 	let mut uniq_srcs: HashSet<PathBuf> = HashSet::with_capacity(srcs.len());
 	let mut uniq_dsts: HashSet<PathBuf> = HashSet::with_capacity(dsts.len());
 
-	let mut src_dst = srcs
+	let dir = tempdir()?;
+	let mut ps = srcs
 		.iter()
 		.zip(dsts)
-		.map(|(s, d)| -> Result<(PathBuf, PathBuf), Error> {
+		.map(|(s, d)| -> Result<(PathBuf, PathBuf, PathBuf), Error> {
 			let s = fs::canonicalize(s)?;
 			let d = env::current_dir()?.join(Path::new(&d));
 			let d = normalize_path(&d);
@@ -119,37 +120,32 @@ fn work() -> Result<(), Error> {
 			} else if !uniq_dsts.insert(d.clone()) {
 				Err(Error::DuplicateOutput(d))
 			} else {
-				Ok((s, d))
+				let mut hasher = DefaultHasher::new();
+				s.hash(&mut hasher);
+				let file = hasher.finish().to_string();
+				let t = dir.path().join(&file);
+				Ok((s, t, d))
 			}
 		})
 		.collect::<Result<Vec<_>, Error>>()?;
 
 	/* Sort the src/dst pairs so that the sources with the longest componenets
 	   come first. */
-	src_dst.sort_by_key(|(s, _)| Reverse(s.components().count()));
+	ps.sort_by_key(|s| Reverse(s.0.components().count()));
 
-	let dir = tempdir()?;
-	for s_d in src_dst.iter_mut() {
-		let (s, d) = s_d;
-		let mut hasher = DefaultHasher::new();
-		s.hash(&mut hasher);
-		let file = hasher.finish().to_string();
-		let dst = dir.path().join(&file);
-
+	for (s, t, _) in ps.iter() {
 		if flags.dryrun {
-			println!("{} -> {}", s.as_path().display(), dst.as_path().display());
+			println!("{} -> {}", s.as_path().display(), t.as_path().display());
 		} else {
-			copy_and_remove_file_or_dir(&s, &dst)?;
+			copy_and_remove_file_or_dir(&s, &t)?;
 		}
-
-		*s_d = (dst, d.to_path_buf())
 	}
 
-	for (s, d) in src_dst.iter().rev() {
+	for (_, t, d) in ps.iter().rev() {
 		if flags.dryrun {
-			println!("{} -> {}", s.as_path().display(), d.as_path().display());
+			println!("{} -> {}", t.as_path().display(), d.as_path().display());
 		} else {
-			copy_and_remove_file_or_dir(&s, &d)?;
+			copy_and_remove_file_or_dir(&t, &d)?;
 		}
 	}
 
