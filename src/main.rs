@@ -134,23 +134,10 @@ fn work() -> Result<(), Error> {
 	ps.sort_by_key(|s| Reverse(s.0.components().count()));
 
 	for (s, t, _) in ps.iter() {
-		if flags.verbose {
-			println!("{} -> {}", s.as_path().display(), t.as_path().display());
-		}
-
-		if !flags.dryrun {
-			copy_and_remove_file_or_dir(&s, &t)?;
-		}
+		move_path(&flags, &s, &t)?;
 	}
-
 	for (_, t, d) in ps.iter().rev() {
-		if flags.verbose {
-			println!("{} -> {}", t.as_path().display(), d.as_path().display());
-		}
-
-		if !flags.dryrun {
-			copy_and_remove_file_or_dir(&t, &d)?;
-		}
+		move_path(&flags, &t, &d)?;
 	}
 
 	Ok(())
@@ -255,6 +242,18 @@ fn normalize_path(path: &Path) -> PathBuf {
 		}
 	}
 	ret
+}
+
+fn move_path(flags: &Flags, from: &PathBuf, to: &PathBuf) -> io::Result<()> {
+	if flags.verbose {
+		println!("{} -> {}", from.as_path().display(), to.as_path().display());
+	}
+
+	if !flags.dryrun {
+		copy_and_remove_file_or_dir(&from, &to)?;
+	}
+
+	Ok(())
 }
 
 fn copy_and_remove_file_or_dir<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> io::Result<()> {
