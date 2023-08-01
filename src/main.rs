@@ -1,5 +1,4 @@
 mod error;
-mod main_result;
 
 use std::{
 	cmp::Reverse,
@@ -14,9 +13,12 @@ use std::{
 	process::{Command, Stdio},
 };
 
-use tempfile::tempdir;
+use {
+	proxit::MainResult,
+	tempfile::tempdir,
+};
 
-use {error::Error, main_result::MainResult};
+use error::Error;
 
 #[derive(Default)]
 struct Flags {
@@ -27,7 +29,7 @@ struct Flags {
 	pub verbose: bool,
 }
 
-fn main() -> MainResult {
+fn main() -> MainResult<(), Error> {
 	work().into()
 }
 

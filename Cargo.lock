@@ -76,8 +76,15 @@ name = "mmv"
 version = "0.1.0"
 dependencies = [
  "lexopt",
+ "proxit",
  "tempfile",
 ]
+
+[[package]]
+name = "proxit"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "799e1d32ce9ca2aabd2ae1806c7673f2ec583b9260415f3416538865dacd2f70"
 
 [[package]]
 name = "redox_syscall"

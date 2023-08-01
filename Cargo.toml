@@ -11,4 +11,5 @@ authors = [
 
 [dependencies]
 lexopt = "0.1.0"
+proxit = "1.0.1"
 tempfile = "3.7.0"
