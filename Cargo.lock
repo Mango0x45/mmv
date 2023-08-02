@@ -21,6 +21,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50d30906286121d95be3d479533b458f87493b30a4b5f79a607db8f5d11aa91f"
 
 [[package]]
+name = "cerm"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae70b99554a0c7adb21b4792c6809f49692db19a904ad0c05fb7092645b26716"
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -75,16 +81,10 @@ checksum = "09fc20d2ca12cb9f044c93e3bd6d32d523e6e2ec3db4f7b2939cd99026ecd3f0"
 name = "mmv"
 version = "0.1.0"
 dependencies = [
+ "cerm",
  "lexopt",
- "proxit",
  "tempfile",
 ]
-
-[[package]]
-name = "proxit"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "799e1d32ce9ca2aabd2ae1806c7673f2ec583b9260415f3416538865dacd2f70"
 
 [[package]]
 name = "redox_syscall"

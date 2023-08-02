@@ -1,5 +1,3 @@
-mod error;
-
 use std::{
 	cmp::Reverse,
 	collections::{hash_map::DefaultHasher, HashSet},
@@ -10,15 +8,13 @@ use std::{
 	io::{self, BufRead, BufReader, BufWriter, Write},
 	iter,
 	path::{Component, Path, PathBuf},
-	process::{Command, Stdio},
+	process::{Command, Stdio, self},
 };
 
 use {
-	proxit::MainResult,
+	cerm::{err, warn},
 	tempfile::tempdir,
 };
-
-use error::Error;
 
 #[derive(Default)]
 struct Flags {
@@ -29,27 +25,37 @@ struct Flags {
 	pub verbose: bool,
 }
 
-fn main() -> MainResult<(), Error> {
-	work().into()
+fn usage(bad_flags: Option<lexopt::Error>) -> ! {
+	let p = env::args().next().unwrap();
+	if let Some(e) = bad_flags {
+		warn!("{e}");
+	}
+	eprintln!("Usage: {p} [-0eiv] command [argument ...]");
+	process::exit(1);
 }
 
-fn work() -> Result<(), Error> {
-	let (flags, rest) = parse_args()?;
-	let (cmd, args) = rest.split_first().ok_or(Error::BadArgs(None))?;
+fn main() {
+	if let Err(e) = work() {
+		err!("{e}");
+	}
+}
+
+fn work() -> Result<(), io::Error> {
+	let (flags, rest) = match parse_args() {
+		Ok(a) => a,
+		Err(e) => usage(Some(e))
+	};
+	let (cmd, args) = rest.split_first().unwrap_or_else(|| usage(None));
 
 	// Collect sources from standard input
-	let srcs = io::stdin()
+	let srcs: Vec<_> = io::stdin()
 		.lines()
-		.map(|l| {
-			l.map_err(Error::from).and_then(|l| {
-				if l.is_empty() {
-					Err(Error::BadArgs(None))
-				} else {
-					Ok(l)
-				}
-			})
+		.map(|x| match x {
+			Err(e) => { err!("{e}"); },
+			Ok(l) if l.is_empty() => usage(None),
+			Ok(l) => l,
 		})
-		.collect::<Result<Vec<String>, Error>>()?;
+		.collect();
 
 	// Spawn the child process
 	let mut child = Command::new(cmd)
@@ -57,21 +63,25 @@ fn work() -> Result<(), Error> {
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
 		.spawn()
-		.map_err(|e| Error::SpawnFailed(cmd.to_owned(), e))?;
+		.unwrap_or_else(|e| {
+			err!("Failed to spawn utility “{}”: {e}", cmd.to_str().unwrap());
+		});
 
 	// Pass the source files to the child process.
-	// TODO: Don’t use expect; create a custom error
 	{
 		let ci = child
 			.stdin
 			.take()
-			.expect("Could not open the child process’ stdin");
+			.unwrap_or_else(|| {
+				err!("Could not open the child process’ stdin");
+			});
 		let mut ci = BufWriter::new(ci);
 		if flags.encode {
 			srcs.iter()
 				.try_for_each(|src| writeln!(ci, "{}", encode_string(src)))?;
 		} else {
-			srcs.iter().try_for_each(|src| writeln!(ci, "{}", src))?;
+			srcs.iter()
+				.try_for_each(|src| writeln!(ci, "{}", src))?;
 		}
 	}
 
@@ -81,13 +91,15 @@ fn work() -> Result<(), Error> {
 		let co = child
 			.stdout
 			.take()
-			.expect("Could not open the child process’ stdout.");
+			.unwrap_or_else(|| {
+				err!("Count not open the child process’ stdout.");
+			});
 		let co = BufReader::new(co);
 
 		// TODO: Don’t allocate an intermediary String per line, by using the BufReader buffer.
-		co.lines().try_for_each(|dst| -> Result<(), Error> {
+		co.lines().try_for_each(|dst| -> Result<(), io::Error> {
 			if flags.encode {
-				dsts.push(decode_string(&dst?)?);
+				dsts.push(decode_string(&dst?));
 			} else {
 				dsts.push(dst?);
 			}
@@ -95,14 +107,14 @@ fn work() -> Result<(), Error> {
 		})?;
 
 		if dsts.len() != srcs.len() {
-			return Err(Error::BadLengths);
+			err!("Files have been added or removed during editing");
 		}
 	}
 
 	/* If the process failed, it is expected to print an error message; as such,
 	   we exit directly. */
 	if !child.wait()?.success() {
-		return Err(Error::Nop);
+		process::exit(1);
 	}
 
 	let mut uniq_srcs: HashSet<PathBuf> = HashSet::with_capacity(srcs.len());
@@ -112,15 +124,15 @@ fn work() -> Result<(), Error> {
 	let mut ps = srcs
 		.iter()
 		.zip(dsts)
-		.map(|(s, d)| -> Result<(PathBuf, PathBuf, PathBuf), Error> {
+		.map(|(s, d)| -> Result<(PathBuf, PathBuf, PathBuf), io::Error> {
 			let s = fs::canonicalize(s)?;
 			let d = env::current_dir()?.join(Path::new(&d));
 			let d = normalize_path(&d);
 
 			if !uniq_srcs.insert(s.clone()) {
-				Err(Error::DuplicateInput(s))
+				err!("Input file “{}” specified more than once", s.to_string_lossy());
 			} else if !uniq_dsts.insert(d.clone()) {
-				Err(Error::DuplicateOutput(d))
+				err!("Output file “{}” specified more than once", d.to_string_lossy());
 			} else {
 				let mut hasher = DefaultHasher::new();
 				s.hash(&mut hasher);
@@ -129,17 +141,17 @@ fn work() -> Result<(), Error> {
 				Ok((s, t, d))
 			}
 		})
-		.collect::<Result<Vec<_>, Error>>()?;
+		.collect::<Result<Vec<_>, io::Error>>()?;
 
 	/* Sort the src/dst pairs so that the sources with the longest componenets
 	   come first. */
 	ps.sort_by_key(|s| Reverse(s.0.components().count()));
 
 	for (s, t, _) in ps.iter() {
-		move_path(&flags, &s, &t)?;
+		move_path(&flags, &s, &t);
 	}
 	for (_, t, d) in ps.iter().rev() {
-		move_path(&flags, &t, &d)?;
+		move_path(&flags, &t, &d);
 	}
 
 	Ok(())
@@ -188,7 +200,7 @@ fn encode_string(s: &str) -> String {
 		.collect::<String>()
 }
 
-fn decode_string(s: &str) -> Result<String, Error> {
+fn decode_string(s: &str) -> String {
 	let mut pv = false;
 
 	s.chars()
@@ -215,7 +227,9 @@ fn decode_string(s: &str) -> Result<String, Error> {
 		})
 		.filter_map(Result::transpose)
 		.collect::<Result<String, ()>>()
-		.map_err(|()| Error::BadDecoding(s.to_string()))
+		.unwrap_or_else(|_| {
+			err!("Decoding the file “{}” failed", s);
+		})
 }
 
 /* Blatantly stolen from the Cargo source code.  This is MIT licensed. */
@@ -246,25 +260,29 @@ fn normalize_path(path: &Path) -> PathBuf {
 	ret
 }
 
-fn move_path(flags: &Flags, from: &PathBuf, to: &PathBuf) -> io::Result<()> {
+fn move_path(flags: &Flags, from: &PathBuf, to: &PathBuf) {
 	if flags.verbose {
 		println!("{} -> {}", from.as_path().display(), to.as_path().display());
 	}
 
 	if !flags.dryrun {
-		copy_and_remove_file_or_dir(&from, &to)?;
+		copy_and_remove_file_or_dir(&from, &to).unwrap_or_else(|(f, e)| {
+			err!("{}: {e}", f.to_string_lossy());
+		});
 	}
-
-	Ok(())
 }
 
-fn copy_and_remove_file_or_dir<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> io::Result<()> {
-	let data = fs::metadata(&from)?;
+fn copy_and_remove_file_or_dir<'a>(
+	from: &'a PathBuf,
+	to: &'a PathBuf
+) -> Result<(), (&'a PathBuf, io::Error)> {
+	let data = fs::metadata(&from).map_err(|e| (from, e))?;
 	if data.is_dir() {
-		fs::create_dir(&to)?;
-		fs::remove_dir(&from)
+		fs::create_dir(&to).map_err(|e| (to, e))?;
+		fs::remove_dir(&from).map_err(|e| (from, e))?
 	} else {
-		fs::copy(&from, &to)?;
-		fs::remove_file(&from)
+		fs::copy(&from, &to).map_err(|e| (to, e))?;
+		fs::remove_file(&from).map_err(|e| (from, e))?
 	}
+	Ok(())
 }
