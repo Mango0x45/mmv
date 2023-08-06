@@ -197,7 +197,7 @@ fn run_indiv(
 		}
 
 		/* If the process failed, it is expected to print an error message; as such,
-		we exit directly. */
+		   we exit directly. */
 		if !child.wait()?.success() {
 			process::exit(1);
 		}
@@ -255,7 +255,7 @@ fn run_multi(
 	}
 
 	/* If the process failed, it is expected to print an error message; as such,
-	we exit directly. */
+	   we exit directly. */
 	if !child.wait()?.success() {
 		process::exit(1);
 	}
