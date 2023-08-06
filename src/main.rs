@@ -156,11 +156,17 @@ fn work() -> Result<(), io::Error> {
 	   come first. */
 	ps.sort_by_key(|s| Reverse(s.0.components().count()));
 
-	for (s, t, _) in ps.iter() {
-		move_path(&flags, &s, &t);
-	}
-	for (_, t, d) in ps.iter().rev() {
-		move_path(&flags, &t, &d);
+	if flags.dryrun {
+		for (s, _, d) in ps {
+			println!("{} -> {}", s.as_path().display(), d.as_path().display());
+		}
+	} else {
+		for (s, t, _) in ps.iter() {
+			move_path(&flags, &s, &t);
+		}
+		for (_, t, d) in ps.iter().rev() {
+			move_path(&flags, &t, &d);
+		}
 	}
 
 	Ok(())
@@ -175,10 +181,7 @@ fn parse_args() -> Result<(Flags, Vec<OsString>), lexopt::Error> {
 	while let Some(arg) = parser.next()? {
 		match arg {
 			Short('0') | Long("nul") => flags.nul = true,
-			Short('d') | Long("dryrun") => {
-				flags.dryrun = true;
-				flags.verbose = true;
-			}
+			Short('d') | Long("dryrun") => flags.dryrun = true,
 			Short('e') | Long("encode") => flags.encode = true,
 			Short('i') | Long("individual") => flags.individual = true,
 			Short('v') | Long("verbose") => flags.verbose = true,
