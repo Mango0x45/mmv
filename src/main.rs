@@ -8,7 +8,7 @@ use std::{
 	io::{self, BufRead, BufReader, BufWriter, Write},
 	iter,
 	path::{Component, Path, PathBuf},
-	process::{Command, Stdio, self},
+	process::{self, Command, Stdio},
 };
 
 use {
@@ -43,7 +43,7 @@ fn main() {
 fn work() -> Result<(), io::Error> {
 	let (flags, rest) = match parse_args() {
 		Ok(a) => a,
-		Err(e) => usage(Some(e))
+		Err(e) => usage(Some(e)),
 	};
 	let (cmd, args) = rest.split_first().unwrap_or_else(|| usage(None));
 
@@ -69,31 +69,24 @@ fn work() -> Result<(), io::Error> {
 
 	// Pass the source files to the child process.
 	{
-		let ci = child
-			.stdin
-			.take()
-			.unwrap_or_else(|| {
-				err!("Could not open the child process’ stdin");
-			});
+		let ci = child.stdin.take().unwrap_or_else(|| {
+			err!("Could not open the child process’ stdin");
+		});
 		let mut ci = BufWriter::new(ci);
 		if flags.encode {
 			srcs.iter()
 				.try_for_each(|src| writeln!(ci, "{}", encode_string(src)))?;
 		} else {
-			srcs.iter()
-				.try_for_each(|src| writeln!(ci, "{}", src))?;
+			srcs.iter().try_for_each(|src| writeln!(ci, "{}", src))?;
 		}
 	}
 
 	// Read the destination file list from the process.
 	let mut dsts = Vec::with_capacity(srcs.len());
 	{
-		let co = child
-			.stdout
-			.take()
-			.unwrap_or_else(|| {
-				err!("Count not open the child process’ stdout.");
-			});
+		let co = child.stdout.take().unwrap_or_else(|| {
+			err!("Count not open the child process’ stdout.");
+		});
 		let co = BufReader::new(co);
 
 		// TODO: Don’t allocate an intermediary String per line, by using the BufReader buffer.
@@ -130,9 +123,15 @@ fn work() -> Result<(), io::Error> {
 			let d = normalize_path(&d);
 
 			if !uniq_srcs.insert(s.clone()) {
-				err!("Input file “{}” specified more than once", s.to_string_lossy());
+				err!(
+					"Input file “{}” specified more than once",
+					s.to_string_lossy()
+				);
 			} else if !uniq_dsts.insert(d.clone()) {
-				err!("Output file “{}” specified more than once", d.to_string_lossy());
+				err!(
+					"Output file “{}” specified more than once",
+					d.to_string_lossy()
+				);
 			} else {
 				let mut hasher = DefaultHasher::new();
 				s.hash(&mut hasher);
@@ -169,7 +168,7 @@ fn parse_args() -> Result<(Flags, Vec<OsString>), lexopt::Error> {
 			Short('d') | Long("dryrun") => {
 				flags.dryrun = true;
 				flags.verbose = true;
-			},
+			}
 			Short('e') | Long("encode") => flags.encode = true,
 			Short('i') | Long("individual") => flags.individual = true,
 			Short('v') | Long("verbose") => flags.verbose = true,
@@ -274,7 +273,7 @@ fn move_path(flags: &Flags, from: &PathBuf, to: &PathBuf) {
 
 fn copy_and_remove_file_or_dir<'a>(
 	from: &'a PathBuf,
-	to: &'a PathBuf
+	to: &'a PathBuf,
 ) -> Result<(), (&'a PathBuf, io::Error)> {
 	let data = fs::metadata(&from).map_err(|e| (from, e))?;
 	if data.is_dir() {
