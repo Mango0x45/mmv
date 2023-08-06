@@ -59,7 +59,7 @@ fn usage(bad_flags: Option<lexopt::Error>) -> ! {
 	if let Some(e) = bad_flags {
 		warn!("{e}");
 	}
-	eprintln!("Usage: {p} [-0eiv] command [argument ...]");
+	eprintln!("Usage: {p} [-0deiv] command [argument ...]");
 	process::exit(1);
 }
 
