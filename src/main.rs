@@ -84,7 +84,7 @@ fn work() -> Result<(), io::Error> {
 				err!("{e}");
 			})
 		})
-		.group_by(|b| *b == (b'\0' + b'\n' * !flags.nul as u8));
+		.group_by(|b| is_terminal(&flags, b));
 	let srcs = srcs
 		.into_iter()
 		.filter(|(x, _)| !x)
@@ -266,7 +266,7 @@ fn run_multi(
 				err!("{e}");
 			})
 		})
-		.group_by(|b| *b == (b'\0' + b'\n' * !flags.nul as u8));
+		.group_by(|b| is_terminal(flags, b));
 	groups
 		.into_iter()
 		.filter_map(|(x, y)| match x {
@@ -394,4 +394,8 @@ fn copy_and_remove_file_or_dir<'a>(
 		fs::remove_file(&from).map_err(|e| (from, e))?
 	}
 	Ok(())
+}
+
+fn is_terminal(flags: &Flags, b: &u8) -> bool {
+	*b == (b'\0' + b'\n' * !flags.nul as u8)
 }
