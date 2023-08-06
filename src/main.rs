@@ -7,7 +7,7 @@ use std::{
 	hash::{Hash, Hasher},
 	io::{self, BufWriter, Read, Write},
 	iter,
-	path::{Component, Path, PathBuf},
+	path::{Component, Display, Path, PathBuf},
 	process::{self, Command, Stdio},
 };
 
@@ -145,7 +145,7 @@ fn work() -> Result<(), io::Error> {
 
 	if flags.dryrun {
 		for (s, _, d) in ps {
-			println!("{} -> {}", s.as_path().display(), d.as_path().display());
+			println!("{} -> {}", disp(&s), disp(&d));
 		}
 	} else {
 		for (s, t, _) in ps.iter() {
@@ -373,7 +373,7 @@ fn normalize_path(path: &Path) -> PathBuf {
 
 fn move_path(flags: &Flags, from: &PathBuf, to: &PathBuf) {
 	if flags.verbose {
-		println!("{} -> {}", from.as_path().display(), to.as_path().display());
+		println!("{} -> {}", disp(&from), disp(&to));
 	}
 
 	if !flags.dryrun {
@@ -400,4 +400,8 @@ fn copy_and_remove_file_or_dir<'a>(
 
 fn is_terminal(flags: &Flags, b: &u8) -> bool {
 	*b == (b'\0' + b'\n' * !flags.nul as u8)
+}
+
+fn disp(pb: &PathBuf) -> Display {
+	pb.as_path().display()
 }
