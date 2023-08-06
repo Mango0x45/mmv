@@ -5,11 +5,13 @@ use std::{
 	ffi::OsString,
 	fs,
 	hash::{Hash, Hasher},
-	io::{self, BufRead, BufReader, BufWriter, Write},
+	io::{self, BufRead, BufReader, BufWriter, Read, Write},
 	iter,
 	path::{Component, Path, PathBuf},
 	process::{self, Command, Stdio},
 };
+
+use itertools::Itertools;
 
 use {
 	cerm::{err, warn},
@@ -48,14 +50,22 @@ fn work() -> Result<(), io::Error> {
 	let (cmd, args) = rest.split_first().unwrap_or_else(|| usage(None));
 
 	// Collect sources from standard input
-	let srcs: Vec<_> = io::stdin()
-		.lines()
-		.map(|x| match x {
-			Err(e) => { err!("{e}"); },
-			Ok(l) if l.is_empty() => usage(None),
-			Ok(l) => l,
+	let srcs = io::stdin()
+		.bytes()
+		.map(|x| {
+			x.unwrap_or_else(|e| {
+				err!("{e}");
+			})
 		})
-		.collect();
+		.group_by(|b| *b == (b'\0' + b'\n' * !flags.nul as u8));
+	let srcs = srcs
+		.into_iter()
+		.filter(|(x, _)| !x)
+		.map(|(_, x)| String::from_utf8(x.collect_vec()))
+		.collect::<Result<Vec<_>, _>>()
+		.unwrap_or_else(|e| {
+			err!("{e}");
+		});
 
 	// Spawn the child process
 	let mut child = Command::new(cmd)
