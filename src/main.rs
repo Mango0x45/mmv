@@ -94,57 +94,15 @@ fn work() -> Result<(), io::Error> {
 			err!("{e}");
 		});
 
-	// Spawn the child process
-	let mut child = Command::new(cmd)
-		.args(args)
-		.stdin(Stdio::piped())
-		.stdout(Stdio::piped())
-		.spawn()
-		.unwrap_or_else(|e| {
-			err!("Failed to spawn utility “{}”: {e}", cmd.to_str().unwrap());
-		});
-
-	// Pass the source files to the child process.
-	{
-		let ci = child.stdin.take().unwrap_or_else(|| {
-			err!("Could not open the child process’ stdin");
-		});
-		let mut ci = BufWriter::new(ci);
-		if flags.encode {
-			srcs.iter()
-				.try_for_each(|src| writeln!(ci, "{}", encode_string(src)))?;
-		} else {
-			srcs.iter().try_for_each(|src| writeln!(ci, "{}", src))?;
-		}
-	}
-
-	// Read the destination file list from the process.
 	let mut dsts = Vec::with_capacity(srcs.len());
-	{
-		let co = child.stdout.take().unwrap_or_else(|| {
-			err!("Count not open the child process’ stdout.");
-		});
-		let co = BufReader::new(co);
-
-		// TODO: Don’t allocate an intermediary String per line, by using the BufReader buffer.
-		co.lines().try_for_each(|dst| -> Result<(), io::Error> {
-			if flags.encode {
-				dsts.push(decode_string(&dst?));
-			} else {
-				dsts.push(dst?);
-			}
-			Ok(())
-		})?;
-
-		if dsts.len() != srcs.len() {
-			err!("Files have been added or removed during editing");
-		}
+	if flags.individual {
+		run_indiv(&srcs, &mut dsts, &flags, cmd, args)?;
+	} else {
+		run_multi(&srcs, &mut dsts, &flags, cmd, args)?;
 	}
 
-	/* If the process failed, it is expected to print an error message; as such,
-	   we exit directly. */
-	if !child.wait()?.success() {
-		process::exit(1);
+	if dsts.len() != srcs.len() {
+		err!("Files have been added or removed during editing");
 	}
 
 	let mut uniq_srcs: HashSet<PathBuf> = HashSet::with_capacity(srcs.len());
@@ -194,6 +152,112 @@ fn work() -> Result<(), io::Error> {
 		for (_, t, d) in ps.iter().rev() {
 			move_path(&flags, &t, &d);
 		}
+	}
+
+	Ok(())
+}
+
+fn run_indiv(
+	srcs: &Vec<String>,
+	dsts: &mut Vec<String>,
+	flags: &Flags,
+	cmd: &OsString,
+	args: &[OsString],
+) -> Result<(), io::Error> {
+	for src in srcs {
+		let mut child = Command::new(cmd)
+			.args(args)
+			.stdin(Stdio::piped())
+			.stdout(Stdio::piped())
+			.spawn()
+			.unwrap_or_else(|e| {
+				err!("Failed to spawn utility: “{}”: {e}", cmd.to_str().unwrap());
+			});
+
+		{
+			let mut ci = child.stdin.take().unwrap_or_else(|| {
+				err!("Could not open the child process’ stdin");
+			});
+			if flags.encode {
+				writeln!(ci, "{}", encode_string(src))?;
+			} else {
+				writeln!(ci, "{}", src)?;
+			}
+		}
+
+		let mut co = child.stdout.take().unwrap_or_else(|| {
+			err!("Count not open the child process’ stdout.");
+		});
+		let mut s = String::with_capacity(src.len());
+		co.read_to_string(&mut s)?;
+		if flags.encode {
+			dsts.push(decode_string(s.as_str()));
+		} else {
+			dsts.push(s);
+		}
+
+		/* If the process failed, it is expected to print an error message; as such,
+		we exit directly. */
+		if !child.wait()?.success() {
+			process::exit(1);
+		}
+	}
+
+	Ok(())
+}
+
+fn run_multi(
+	srcs: &Vec<String>,
+	dsts: &mut Vec<String>,
+	flags: &Flags,
+	cmd: &OsString,
+	args: &[OsString],
+) -> Result<(), io::Error> {
+	let mut child = Command::new(cmd)
+		.args(args)
+		.stdin(Stdio::piped())
+		.stdout(Stdio::piped())
+		.spawn()
+		.unwrap_or_else(|e| {
+			err!("Failed to spawn utility “{}”: {e}", cmd.to_str().unwrap());
+		});
+
+	// Pass the source files to the child process.
+	{
+		let ci = child.stdin.take().unwrap_or_else(|| {
+			err!("Could not open the child process’ stdin");
+		});
+		let mut ci = BufWriter::new(ci);
+		if flags.encode {
+			srcs.iter()
+				.try_for_each(|src| writeln!(ci, "{}", encode_string(src)))?;
+		} else {
+			srcs.iter().try_for_each(|src| writeln!(ci, "{}", src))?;
+		}
+	}
+
+	// Read the destination file list from the process.
+	{
+		let co = child.stdout.take().unwrap_or_else(|| {
+			err!("Count not open the child process’ stdout.");
+		});
+		let co = BufReader::new(co);
+
+		// TODO: Don’t allocate an intermediary String per line, by using the BufReader buffer.
+		co.lines().try_for_each(|dst| -> Result<(), io::Error> {
+			if flags.encode {
+				dsts.push(decode_string(&dst?));
+			} else {
+				dsts.push(dst?);
+			}
+			Ok(())
+		})?;
+	}
+
+	/* If the process failed, it is expected to print an error message; as such,
+	we exit directly. */
+	if !child.wait()?.success() {
+		process::exit(1);
 	}
 
 	Ok(())
