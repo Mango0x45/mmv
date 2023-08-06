@@ -76,7 +76,7 @@ fn work() -> Result<(), io::Error> {
 	};
 	let (cmd, args) = rest.split_first().unwrap_or_else(|| usage(None));
 
-	// Collect sources from standard input
+	/* Collect sources from standard input */
 	let srcs = io::stdin()
 		.bytes()
 		.map(|x| {
@@ -235,7 +235,7 @@ fn run_multi(
 			err!("Failed to spawn utility “{}”: {e}", cmd.to_str().unwrap());
 		});
 
-	// Pass the source files to the child process.
+	/* Pass the source files to the child process. */
 	{
 		let ci = child.stdin.take().unwrap_or_else(|| {
 			err!("Could not open the child process’ stdin");
@@ -255,7 +255,7 @@ fn run_multi(
 		}
 	}
 
-	// Read the destination file list from the process.
+	/* Read the destination file list from the process. */
 	let co = child.stdout.take().unwrap_or_else(|| {
 		err!("Count not open the child process’ stdout.");
 	});
