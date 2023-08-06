@@ -109,7 +109,7 @@ fn work() -> Result<(), io::Error> {
 	let mut uniq_dsts: HashSet<PathBuf> = HashSet::with_capacity(dsts.len());
 
 	let dir = tempdir()?;
-	let mut ps = srcs
+	let ps = srcs
 		.iter()
 		.zip(dsts)
 		.map(|(s, d)| -> Result<(PathBuf, PathBuf, PathBuf), io::Error> {
@@ -135,11 +135,13 @@ fn work() -> Result<(), io::Error> {
 				Ok((s, t, d))
 			}
 		})
-		.collect::<Result<Vec<_>, io::Error>>()?;
-
-	/* Sort the src/dst pairs so that the sources with the longest componenets
-	   come first. */
-	ps.sort_by_key(|s| Reverse(s.0.components().count()));
+		.map(|x| {
+			x.unwrap_or_else(|e| {
+				err!("{e}");
+			})
+		})
+		.sorted_by_key(|s| Reverse(s.0.components().count()))
+		.collect_vec();
 
 	if flags.dryrun {
 		for (s, _, d) in ps {
