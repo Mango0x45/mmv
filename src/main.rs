@@ -5,7 +5,7 @@ use std::{
 	ffi::OsString,
 	fs,
 	hash::{Hash, Hasher},
-	io::{self, BufRead, BufReader, BufWriter, Read, Write},
+	io::{self, BufWriter, Read, Write},
 	iter,
 	path::{Component, Path, PathBuf},
 	process::{self, Command, Stdio},
@@ -178,11 +178,16 @@ fn run_indiv(
 			let mut ci = child.stdin.take().unwrap_or_else(|| {
 				err!("Could not open the child process’ stdin");
 			});
-			if flags.encode {
-				writeln!(ci, "{}", encode_string(src))?;
-			} else {
-				writeln!(ci, "{}", src)?;
-			}
+			write!(
+				ci,
+				"{}",
+				if flags.encode {
+					encode_string(src)
+				} else {
+					src.to_owned()
+				}
+			)?;
+			ci.write_all(if flags.nul { &[b'\0'] } else { &[b'\n'] })?;
 		}
 
 		let mut co = child.stdout.take().unwrap_or_else(|| {
@@ -190,14 +195,22 @@ fn run_indiv(
 		});
 		let mut s = String::with_capacity(src.len());
 		co.read_to_string(&mut s)?;
-		if flags.encode {
-			dsts.push(decode_string(s.as_str()));
+		match s.chars().last().unwrap_or_else(|| {
+			err!("Filename can’t be the empty string");
+		}) {
+			'\n' | '\0' => {
+				s.pop();
+			}
+			_ => {}
+		};
+		dsts.push(if flags.encode {
+			decode_string(s.as_str())
 		} else {
-			dsts.push(s);
-		}
+			s
+		});
 
 		/* If the process failed, it is expected to print an error message; as such,
-		   we exit directly. */
+		we exit directly. */
 		if !child.wait()?.success() {
 			process::exit(1);
 		}
@@ -228,31 +241,48 @@ fn run_multi(
 			err!("Could not open the child process’ stdin");
 		});
 		let mut ci = BufWriter::new(ci);
-		if flags.encode {
-			srcs.iter()
-				.try_for_each(|src| writeln!(ci, "{}", encode_string(src)))?;
-		} else {
-			srcs.iter().try_for_each(|src| writeln!(ci, "{}", src))?;
+		for src in srcs {
+			write!(
+				ci,
+				"{}",
+				if flags.encode {
+					encode_string(src)
+				} else {
+					src.to_owned()
+				}
+			)?;
+			ci.write_all(if flags.nul { &[b'\0'] } else { &[b'\n'] })?;
 		}
 	}
 
 	// Read the destination file list from the process.
-	{
-		let co = child.stdout.take().unwrap_or_else(|| {
-			err!("Count not open the child process’ stdout.");
-		});
-		let co = BufReader::new(co);
-
-		// TODO: Don’t allocate an intermediary String per line, by using the BufReader buffer.
-		co.lines().try_for_each(|dst| -> Result<(), io::Error> {
-			if flags.encode {
-				dsts.push(decode_string(&dst?));
+	let co = child.stdout.take().unwrap_or_else(|| {
+		err!("Count not open the child process’ stdout.");
+	});
+	let groups = co
+		.bytes()
+		.map(|x| {
+			x.unwrap_or_else(|e| {
+				err!("{e}");
+			})
+		})
+		.group_by(|b| *b == (b'\0' + b'\n' * !flags.nul as u8));
+	groups
+		.into_iter()
+		.filter_map(|(x, y)| match x {
+			true => None,
+			false => Some(y),
+		})
+		.for_each(|x| {
+			let dst = String::from_utf8(x.collect_vec()).unwrap_or_else(|e| {
+				err!("{e}");
+			});
+			dsts.push(if flags.encode {
+				decode_string(&dst)
 			} else {
-				dsts.push(dst?);
-			}
-			Ok(())
-		})?;
-	}
+				dst
+			});
+		});
 
 	/* If the process failed, it is expected to print an error message; as such,
 	   we exit directly. */
