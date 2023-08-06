@@ -27,6 +27,33 @@ struct Flags {
 	pub verbose: bool,
 }
 
+impl Flags {
+	fn parse() -> Result<(Flags, Vec<OsString>), lexopt::Error> {
+		use lexopt::prelude::*;
+
+		let mut rest = Vec::with_capacity(env::args().len());
+		let mut flags = Flags::default();
+		let mut parser = lexopt::Parser::from_env();
+
+		while let Some(arg) = parser.next()? {
+			match arg {
+				Short('0') | Long("nul") => flags.nul = true,
+				Short('d') | Long("dryrun") => flags.dryrun = true,
+				Short('e') | Long("encode") => flags.encode = true,
+				Short('i') | Long("individual") => flags.individual = true,
+				Short('v') | Long("verbose") => flags.verbose = true,
+				Value(v) => {
+					rest.push(v);
+					rest.extend(iter::from_fn(|| parser.value().ok()));
+				}
+				_ => return Err(arg.unexpected()),
+			}
+		}
+
+		Ok((flags, rest))
+	}
+}
+
 fn usage(bad_flags: Option<lexopt::Error>) -> ! {
 	let p = env::args().next().unwrap();
 	if let Some(e) = bad_flags {
@@ -43,7 +70,7 @@ fn main() {
 }
 
 fn work() -> Result<(), io::Error> {
-	let (flags, rest) = match parse_args() {
+	let (flags, rest) = match Flags::parse() {
 		Ok(a) => a,
 		Err(e) => usage(Some(e)),
 	};
@@ -170,30 +197,6 @@ fn work() -> Result<(), io::Error> {
 	}
 
 	Ok(())
-}
-
-fn parse_args() -> Result<(Flags, Vec<OsString>), lexopt::Error> {
-	use lexopt::prelude::*;
-
-	let mut rest = Vec::with_capacity(env::args().len());
-	let mut flags = Flags::default();
-	let mut parser = lexopt::Parser::from_env();
-	while let Some(arg) = parser.next()? {
-		match arg {
-			Short('0') | Long("nul") => flags.nul = true,
-			Short('d') | Long("dryrun") => flags.dryrun = true,
-			Short('e') | Long("encode") => flags.encode = true,
-			Short('i') | Long("individual") => flags.individual = true,
-			Short('v') | Long("verbose") => flags.verbose = true,
-			Value(v) => {
-				rest.push(v);
-				rest.extend(iter::from_fn(|| parser.value().ok()));
-			}
-			_ => return Err(arg.unexpected()),
-		}
-	}
-
-	Ok((flags, rest))
 }
 
 fn encode_string(s: &str) -> String {
