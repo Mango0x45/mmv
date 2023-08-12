@@ -131,6 +131,18 @@ fn work() -> Result<(), io::Error> {
 		.sorted_by_key(|s| Reverse(s.0.components().count()))
 		.collect_vec();
 
+	let pid = process::id().to_string();
+	let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
+		err!("XDG_CACHE_HOME variable must be set");
+	});
+	let cache_dir = [Path::new(cache_base.as_str()), Path::new("mmv"), Path::new(pid.as_str())].iter().collect::<PathBuf>();
+	fs::create_dir_all(&cache_dir)?;
+
+	let cwd = require!(env::current_dir());
+	require!(env::set_current_dir(cache_dir));
+	backup_srcs(ps.iter().map(|(s, _, _)| s))?;
+	require!(env::set_current_dir(cwd));
+
 	if flags.dryrun {
 		for (s, _, d) in ps {
 			println!("{} -> {}", disp(&s), disp(&d));
@@ -141,6 +153,25 @@ fn work() -> Result<(), io::Error> {
 		}
 		for (_, t, d) in ps.iter().rev() {
 			move_path(&flags, &t, &d);
+		}
+	}
+
+	Ok(())
+}
+
+fn backup_srcs<'a, I>(xs: I) -> Result<(), io::Error>
+where
+	I: Iterator<Item = &'a PathBuf>
+{
+	for x in xs {
+		let data = require!(fs::metadata(x));
+		if data.is_dir() {
+			fs::create_dir_all(require!(x.strip_prefix("/")))?;
+		} else {
+			if let Some(p) = x.parent() {
+				fs::create_dir_all(require!(p.strip_prefix("/")))?;
+			}
+			fs::copy(x, require!(x.strip_prefix("/")))?;
 		}
 	}
 
