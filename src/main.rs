@@ -263,7 +263,6 @@ fn run_indiv(
 					src.to_owned()
 				}
 			)?;
-			ci.write_all(if flags.nul { &[b'\0'] } else { &[b'\n'] })?;
 		}
 
 		let mut co = child.stdout.take().unwrap_or_else(|| {
@@ -271,14 +270,6 @@ fn run_indiv(
 		});
 		let mut s = String::with_capacity(src.len());
 		co.read_to_string(&mut s)?;
-		match s.chars().last().unwrap_or_else(|| {
-			err!("Filename can’t be the empty string");
-		}) {
-			'\n' | '\0' => {
-				s.pop();
-			}
-			_ => {}
-		};
 		dsts.push(if flags.encode {
 			decode_string(s.as_str())
 		} else {
