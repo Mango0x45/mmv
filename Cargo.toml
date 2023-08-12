@@ -5,9 +5,7 @@ edition = "2021"
 license = "0BSD"
 description = "Move multiple/mapped files"
 repository = "https://git.thomasvoss.com/mmv"
-authors = [
-	"Thomas Voss <mail@thomasvoss.com>",
-]
+authors = ["Thomas Voss <mail@thomasvoss.com>"]
 
 [dependencies]
 cerm = "1.1.1"
