@@ -118,7 +118,7 @@ fn work() -> Result<(), io::Error> {
 	if flags.verbose {
 		eprintln!("created directory ‘{}’", dir.path().display());
 	}
-	
+
 	let ps = srcs
 		.iter()
 		.zip(dsts)
@@ -155,7 +155,13 @@ fn work() -> Result<(), io::Error> {
 		let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
 			err!("XDG_CACHE_HOME variable must be set");
 		});
-		cache_dir = [Path::new(cache_base.as_str()), Path::new("mmv"), Path::new(pid.as_str())].iter().collect::<PathBuf>();
+		cache_dir = [
+			Path::new(cache_base.as_str()),
+			Path::new("mmv"),
+			Path::new(pid.as_str()),
+		]
+		.iter()
+		.collect::<PathBuf>();
 		fs::create_dir_all(&cache_dir)?;
 
 		if flags.verbose {
@@ -193,7 +199,7 @@ fn work() -> Result<(), io::Error> {
 
 fn backup_srcs<'a, I>(flags: &Flags, cwd: &PathBuf, xs: I) -> Result<(), io::Error>
 where
-	I: Iterator<Item = &'a PathBuf>
+	I: Iterator<Item = &'a PathBuf>,
 {
 	for x in xs {
 		let data = require!(fs::metadata(x));
@@ -214,7 +220,12 @@ where
 			let rel_x = require!(x.strip_prefix("/"));
 			fs::copy(x, rel_x)?;
 			if flags.verbose {
-				eprintln!("copied ‘{}’ -> ‘{}/{}’", disp(x), disp(cwd), rel_x.display());
+				eprintln!(
+					"copied ‘{}’ -> ‘{}/{}’",
+					disp(x),
+					disp(cwd),
+					rel_x.display()
+				);
 			}
 		}
 	}
@@ -316,7 +327,11 @@ fn run_multi(
 					src.to_owned()
 				}
 			)?;
-			ci.write_all(if flags.nul && !flags.encode { &[b'\0'] } else { &[b'\n'] })?;
+			ci.write_all(if flags.nul && !flags.encode {
+				&[b'\0']
+			} else {
+				&[b'\n']
+			})?;
 		}
 	}
 
