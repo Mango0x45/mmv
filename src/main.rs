@@ -14,7 +14,7 @@ use std::{
 use itertools::Itertools;
 
 use {
-	cerm::{err, warn},
+	cerm::{err, require, warn},
 	tempfile::tempdir,
 };
 
@@ -64,9 +64,7 @@ fn usage(bad_flags: Option<lexopt::Error>) -> ! {
 }
 
 fn main() {
-	if let Err(e) = work() {
-		err!("{e}");
-	}
+	require!(work())
 }
 
 fn work() -> Result<(), io::Error> {
@@ -79,20 +77,14 @@ fn work() -> Result<(), io::Error> {
 	/* Collect sources from standard input */
 	let srcs = io::stdin()
 		.bytes()
-		.map(|x| {
-			x.unwrap_or_else(|e| {
-				err!("{e}");
-			})
-		})
+		.map(|x| require!(x))
 		.group_by(|b| is_terminal(&flags, b));
 	let srcs = srcs
 		.into_iter()
 		.filter(|(x, _)| !x)
 		.map(|(_, x)| String::from_utf8(x.collect_vec()))
-		.collect::<Result<Vec<_>, _>>()
-		.unwrap_or_else(|e| {
-			err!("{e}");
-		});
+		.collect::<Result<Vec<_>, _>>();
+	let srcs = require!(srcs);
 
 	let mut dsts = Vec::with_capacity(srcs.len());
 	if flags.individual {
@@ -135,11 +127,7 @@ fn work() -> Result<(), io::Error> {
 				Ok((s, t, d))
 			}
 		})
-		.map(|x| {
-			x.unwrap_or_else(|e| {
-				err!("{e}");
-			})
-		})
+		.map(|x| require!(x))
 		.sorted_by_key(|s| Reverse(s.0.components().count()))
 		.collect_vec();
 
@@ -263,11 +251,7 @@ fn run_multi(
 	});
 	let groups = co
 		.bytes()
-		.map(|x| {
-			x.unwrap_or_else(|e| {
-				err!("{e}");
-			})
-		})
+		.map(|x| require!(x))
 		.group_by(|b| is_terminal(flags, b));
 	groups
 		.into_iter()
@@ -276,9 +260,7 @@ fn run_multi(
 			false => Some(y),
 		})
 		.for_each(|x| {
-			let dst = String::from_utf8(x.collect_vec()).unwrap_or_else(|e| {
-				err!("{e}");
-			});
+			let dst = require!(String::from_utf8(x.collect_vec()));
 			dsts.push(if flags.encode {
 				decode_string(&dst)
 			} else {
