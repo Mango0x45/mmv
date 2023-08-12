@@ -18,14 +18,26 @@ use {
 	tempfile::tempdir,
 };
 
-#[derive(Default)]
 struct Flags {
+	pub backup: bool,
 	pub dryrun: bool,
 	pub encode: bool,
 	pub individual: bool,
-	pub nobackup: bool,
 	pub nul: bool,
 	pub verbose: bool,
+}
+
+impl Default for Flags {
+	fn default() -> Self {
+		Flags {
+			backup: true,
+			dryrun: false,
+			encode: false,
+			individual: false,
+			nul: false,
+			verbose: false,
+		}
+	}
 }
 
 impl Flags {
@@ -42,7 +54,7 @@ impl Flags {
 				Short('d') | Long("dryrun") => flags.dryrun = true,
 				Short('e') | Long("encode") => flags.encode = true,
 				Short('i') | Long("individual") => flags.individual = true,
-				Short('n') | Long("no-backup") => flags.nobackup = true,
+				Short('n') | Long("no-backup") => flags.backup = false,
 				Short('v') | Long("verbose") => flags.verbose = true,
 				Value(v) => {
 					rest.push(v);
@@ -134,7 +146,7 @@ fn work() -> Result<(), io::Error> {
 		.collect_vec();
 
 	let mut cache_dir = PathBuf::default();
-	if !flags.nobackup {
+	if flags.backup {
 		let pid = process::id().to_string();
 		let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
 			err!("XDG_CACHE_HOME variable must be set");
@@ -161,7 +173,7 @@ fn work() -> Result<(), io::Error> {
 		}
 	}
 
-	if !flags.nobackup {
+	if flags.backup {
 		fs::remove_dir_all(cache_dir)?;
 	}
 
