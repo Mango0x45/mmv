@@ -51,7 +51,7 @@ impl Flags {
 		while let Some(arg) = parser.next()? {
 			match arg {
 				Short('0') | Long("nul") => flags.nul = true,
-				Short('d') | Long("dryrun") => flags.dryrun = true,
+				Short('d') | Long("dry-run") => flags.dryrun = true,
 				Short('e') | Long("encode") => flags.encode = true,
 				Short('i') | Long("individual") => flags.individual = true,
 				Short('n') | Long("no-backup") => flags.backup = false,
