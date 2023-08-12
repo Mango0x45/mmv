@@ -115,6 +115,10 @@ fn work() -> Result<(), io::Error> {
 	let mut uniq_dsts: HashSet<PathBuf> = HashSet::with_capacity(dsts.len());
 
 	let dir = tempdir()?;
+	if flags.verbose {
+		eprintln!("created directory ‘{}’", dir.path().display());
+	}
+	
 	let ps = srcs
 		.iter()
 		.zip(dsts)
@@ -154,15 +158,19 @@ fn work() -> Result<(), io::Error> {
 		cache_dir = [Path::new(cache_base.as_str()), Path::new("mmv"), Path::new(pid.as_str())].iter().collect::<PathBuf>();
 		fs::create_dir_all(&cache_dir)?;
 
+		if flags.verbose {
+			eprintln!("created directory ‘{}’", cache_dir.display());
+		}
+
 		let cwd = require!(env::current_dir());
 		require!(env::set_current_dir(&cache_dir));
-		backup_srcs(ps.iter().map(|(s, _, _)| s))?;
+		backup_srcs(&flags, &cache_dir, ps.iter().map(|(s, _, _)| s))?;
 		require!(env::set_current_dir(cwd));
 	}
 
 	if flags.dryrun {
 		for (s, _, d) in ps {
-			println!("{} -> {}", disp(&s), disp(&d));
+			println!("renamed ‘{}’ -> ‘{}’", disp(&s), disp(&d));
 		}
 	} else {
 		for (s, t, _) in ps.iter() {
@@ -174,25 +182,40 @@ fn work() -> Result<(), io::Error> {
 	}
 
 	if flags.backup {
-		fs::remove_dir_all(cache_dir)?;
+		fs::remove_dir_all(&cache_dir)?;
+		if flags.verbose {
+			eprintln!("removing directory ‘{}’", disp(&cache_dir));
+		}
 	}
 
 	Ok(())
 }
 
-fn backup_srcs<'a, I>(xs: I) -> Result<(), io::Error>
+fn backup_srcs<'a, I>(flags: &Flags, cwd: &PathBuf, xs: I) -> Result<(), io::Error>
 where
 	I: Iterator<Item = &'a PathBuf>
 {
 	for x in xs {
 		let data = require!(fs::metadata(x));
 		if data.is_dir() {
-			fs::create_dir_all(require!(x.strip_prefix("/")))?;
+			let rel_x = require!(x.strip_prefix("/"));
+			fs::create_dir_all(rel_x)?;
+			if flags.verbose {
+				eprintln!("created directory ‘{}/{}’", disp(cwd), rel_x.display());
+			}
 		} else {
 			if let Some(p) = x.parent() {
-				fs::create_dir_all(require!(p.strip_prefix("/")))?;
+				let rel_x = require!(p.strip_prefix("/"));
+				fs::create_dir_all(rel_x)?;
+				if flags.verbose {
+					eprintln!("created directory ‘{}/{}’", disp(cwd), rel_x.display());
+				}
 			}
-			fs::copy(x, require!(x.strip_prefix("/")))?;
+			let rel_x = require!(x.strip_prefix("/"));
+			fs::copy(x, rel_x)?;
+			if flags.verbose {
+				eprintln!("copied ‘{}’ -> ‘{}/{}’", disp(x), disp(cwd), rel_x.display());
+			}
 		}
 	}
 
@@ -406,14 +429,14 @@ fn normalize_path(path: &Path) -> PathBuf {
 }
 
 fn move_path(flags: &Flags, from: &PathBuf, to: &PathBuf) {
-	if flags.verbose {
-		println!("{} -> {}", disp(&from), disp(&to));
-	}
-
 	if !flags.dryrun {
 		copy_and_remove_file_or_dir(&from, &to).unwrap_or_else(|(f, e)| {
 			err!("{}: {e}", f.to_string_lossy());
 		});
+	}
+
+	if flags.verbose {
+		eprintln!("renamed ‘{}’ -> ‘{}’", disp(&from), disp(&to));
 	}
 }
 
