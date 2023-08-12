@@ -176,7 +176,7 @@ fn work() -> Result<(), io::Error> {
 
 	if flags.dryrun {
 		for (s, _, d) in ps {
-			println!("renamed ‘{}’ -> ‘{}’", disp(&s), disp(&d));
+			eprintln!("renamed ‘{}’ -> ‘{}’", disp(&s), disp(&d));
 		}
 	} else {
 		for (s, t, _) in ps.iter() {
