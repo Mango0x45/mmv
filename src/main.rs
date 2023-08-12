@@ -92,7 +92,7 @@ fn work() -> Result<(), io::Error> {
 	let srcs = io::stdin()
 		.bytes()
 		.map(|x| require!(x))
-		.group_by(|b| is_terminal(&flags, b));
+		.group_by(|b| is_terminal(flags.nul, b));
 	let srcs = srcs
 		.into_iter()
 		.filter(|(x, _)| !x)
@@ -316,7 +316,7 @@ fn run_multi(
 					src.to_owned()
 				}
 			)?;
-			ci.write_all(if flags.nul { &[b'\0'] } else { &[b'\n'] })?;
+			ci.write_all(if flags.nul && !flags.encode { &[b'\0'] } else { &[b'\n'] })?;
 		}
 	}
 
@@ -327,7 +327,7 @@ fn run_multi(
 	let groups = co
 		.bytes()
 		.map(|x| require!(x))
-		.group_by(|b| is_terminal(flags, b));
+		.group_by(|b| is_terminal(flags.nul && !flags.encode, b));
 	groups
 		.into_iter()
 		.filter_map(|(x, y)| match x {
@@ -455,8 +455,8 @@ fn copy_and_remove_file_or_dir<'a>(
 	Ok(())
 }
 
-fn is_terminal(flags: &Flags, b: &u8) -> bool {
-	*b == (b'\0' + b'\n' * !flags.nul as u8)
+fn is_terminal(nul: bool, b: &u8) -> bool {
+	*b == (b'\0' + b'\n' * !nul as u8)
 }
 
 fn disp(pb: &PathBuf) -> Display {
