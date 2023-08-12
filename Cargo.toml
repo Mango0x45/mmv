@@ -3,7 +3,7 @@ name = "mmv"
 version = "0.1.0"
 edition = "2021"
 license = "0BSD"
-description = "Move multiple/mapped files"
+description = "Mapped file moves"
 repository = "https://git.sr.ht/~mango/mmv"
 authors = ["Thomas Voss <mail@thomasvoss.com>"]
 
