@@ -23,6 +23,7 @@ struct Flags {
 	pub dryrun: bool,
 	pub encode: bool,
 	pub individual: bool,
+	pub nobackup: bool,
 	pub nul: bool,
 	pub verbose: bool,
 }
@@ -41,6 +42,7 @@ impl Flags {
 				Short('d') | Long("dryrun") => flags.dryrun = true,
 				Short('e') | Long("encode") => flags.encode = true,
 				Short('i') | Long("individual") => flags.individual = true,
+				Short('n') | Long("no-backup") => flags.nobackup = true,
 				Short('v') | Long("verbose") => flags.verbose = true,
 				Value(v) => {
 					rest.push(v);
@@ -59,7 +61,7 @@ fn usage(bad_flags: Option<lexopt::Error>) -> ! {
 	if let Some(e) = bad_flags {
 		warn!("{e}");
 	}
-	eprintln!("Usage: {p} [-0deiv] command [argument ...]");
+	eprintln!("Usage: {p} [-0deinv] command [argument ...]");
 	process::exit(1);
 }
 
@@ -131,17 +133,19 @@ fn work() -> Result<(), io::Error> {
 		.sorted_by_key(|s| Reverse(s.0.components().count()))
 		.collect_vec();
 
-	let pid = process::id().to_string();
-	let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
-		err!("XDG_CACHE_HOME variable must be set");
-	});
-	let cache_dir = [Path::new(cache_base.as_str()), Path::new("mmv"), Path::new(pid.as_str())].iter().collect::<PathBuf>();
-	fs::create_dir_all(&cache_dir)?;
+	if !flags.nobackup {
+		let pid = process::id().to_string();
+		let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
+			err!("XDG_CACHE_HOME variable must be set");
+		});
+		let cache_dir = [Path::new(cache_base.as_str()), Path::new("mmv"), Path::new(pid.as_str())].iter().collect::<PathBuf>();
+		fs::create_dir_all(&cache_dir)?;
 
-	let cwd = require!(env::current_dir());
-	require!(env::set_current_dir(cache_dir));
-	backup_srcs(ps.iter().map(|(s, _, _)| s))?;
-	require!(env::set_current_dir(cwd));
+		let cwd = require!(env::current_dir());
+		require!(env::set_current_dir(cache_dir));
+		backup_srcs(ps.iter().map(|(s, _, _)| s))?;
+		require!(env::set_current_dir(cwd));
+	}
 
 	if flags.dryrun {
 		for (s, _, d) in ps {
