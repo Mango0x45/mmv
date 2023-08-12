@@ -133,16 +133,17 @@ fn work() -> Result<(), io::Error> {
 		.sorted_by_key(|s| Reverse(s.0.components().count()))
 		.collect_vec();
 
+	let mut cache_dir = PathBuf::default();
 	if !flags.nobackup {
 		let pid = process::id().to_string();
 		let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
 			err!("XDG_CACHE_HOME variable must be set");
 		});
-		let cache_dir = [Path::new(cache_base.as_str()), Path::new("mmv"), Path::new(pid.as_str())].iter().collect::<PathBuf>();
+		cache_dir = [Path::new(cache_base.as_str()), Path::new("mmv"), Path::new(pid.as_str())].iter().collect::<PathBuf>();
 		fs::create_dir_all(&cache_dir)?;
 
 		let cwd = require!(env::current_dir());
-		require!(env::set_current_dir(cache_dir));
+		require!(env::set_current_dir(&cache_dir));
 		backup_srcs(ps.iter().map(|(s, _, _)| s))?;
 		require!(env::set_current_dir(cwd));
 	}
@@ -158,6 +159,10 @@ fn work() -> Result<(), io::Error> {
 		for (_, t, d) in ps.iter().rev() {
 			move_path(&flags, &t, &d);
 		}
+	}
+
+	if !flags.nobackup {
+		fs::remove_dir_all(cache_dir)?;
 	}
 
 	Ok(())
