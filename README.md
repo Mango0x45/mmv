@@ -2,7 +2,7 @@
 
 The `mmv` utility is a command-line tool to help you easily and safely perform
 complex file moves and -renamings.  Unlike basically all file renaming tools I
-have seen online, this utility does lot limit you to using specific built-in
+have seen online, this utility does not limit you to using specific built-in
 functions which offer only part of the functionality one might need.  This
 utility also tries to be as safe as possible — you would be amazed at how many
 file renaming tools lose your data when you try something as simple as swapping
