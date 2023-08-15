@@ -9,6 +9,7 @@ use std::{
 	iter,
 	path::{Component, Display, Path, PathBuf},
 	process::{self, Command, Stdio},
+	time::{SystemTime, UNIX_EPOCH},
 };
 
 use itertools::Itertools;
@@ -151,14 +152,16 @@ fn work() -> Result<(), io::Error> {
 
 	let mut cache_dir = PathBuf::default();
 	if flags.backup {
-		let pid = process::id().to_string();
+		let ts = require!(SystemTime::now().duration_since(UNIX_EPOCH))
+			.as_secs()
+			.to_string();
 		let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
 			err!("XDG_CACHE_HOME variable must be set");
 		});
 		cache_dir = [
 			Path::new(cache_base.as_str()),
 			Path::new("mmv"),
-			Path::new(pid.as_str()),
+			Path::new(ts.as_str()),
 		]
 		.iter()
 		.collect::<PathBuf>();
