@@ -153,7 +153,7 @@ fn work() -> Result<(), io::Error> {
 	let mut cache_dir = PathBuf::default();
 	if flags.backup {
 		let ts = require!(SystemTime::now().duration_since(UNIX_EPOCH))
-			.as_secs()
+			.as_nanos()
 			.to_string();
 		let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
 			err!("XDG_CACHE_HOME variable must be set");
