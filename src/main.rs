@@ -24,6 +24,7 @@ struct Flags {
 	pub dryrun: bool,
 	pub encode: bool,
 	pub individual: bool,
+	pub mcp: bool,
 	pub nul: bool,
 	pub verbose: bool,
 }
@@ -35,6 +36,7 @@ impl Default for Flags {
 			dryrun: false,
 			encode: false,
 			individual: false,
+			mcp: false,
 			nul: false,
 			verbose: false,
 		}
@@ -49,13 +51,21 @@ impl Flags {
 		let mut flags = Flags::default();
 		let mut parser = lexopt::Parser::from_env();
 
+		let argv0 = env::args().next().unwrap();
+		let p = Path::new(&argv0).file_name().unwrap();
+
+		if p == "mcp" {
+			flags.mcp = true;
+			flags.backup = false;
+		}
+
 		while let Some(arg) = parser.next()? {
 			match arg {
 				Short('0') | Long("nul") => flags.nul = true,
 				Short('d') | Long("dry-run") => flags.dryrun = true,
 				Short('e') | Long("encode") => flags.encode = true,
 				Short('i') | Long("individual") => flags.individual = true,
-				Short('n') | Long("no-backup") => flags.backup = false,
+				Short('n') | Long("no-backup") if !flags.mcp => flags.backup = false,
 				Short('v') | Long("verbose") => flags.verbose = true,
 				Value(v) => {
 					rest.push(v);
@@ -70,11 +80,16 @@ impl Flags {
 }
 
 fn usage(bad_flags: Option<lexopt::Error>) -> ! {
-	let p = env::args().next().unwrap();
 	if let Some(e) = bad_flags {
 		warn!("{e}");
 	}
-	eprintln!("Usage: {p} [-0deinv] command [argument ...]");
+	let argv0 = env::args().next().unwrap();
+	let p = Path::new(&argv0).file_name().unwrap();
+	if p == "mcp" {
+		eprintln!("Usage: {} [-0deiv] command [argument ...]", p.to_str().unwrap());
+	} else {
+		eprintln!("Usage: {} [-0deinv] command [argument ...]", p.to_str().unwrap());
+	}
 	process::exit(1);
 }
 
@@ -179,7 +194,12 @@ fn work() -> Result<(), io::Error> {
 
 	if flags.dryrun {
 		for (s, _, d) in ps {
-			eprintln!("renamed ‘{}’ -> ‘{}’", disp(&s), disp(&d));
+			eprintln!(
+				"{} ‘{}’ -> ‘{}’",
+				if flags.mcp { "copied" } else { "renamed" },
+				disp(&s),
+				disp(&d)
+			);
 		}
 	} else {
 		for (s, t, _) in ps.iter() {
@@ -439,27 +459,37 @@ fn normalize_path(path: &Path) -> PathBuf {
 
 fn move_path(flags: &Flags, from: &PathBuf, to: &PathBuf) {
 	if !flags.dryrun {
-		copy_and_remove_file_or_dir(&from, &to).unwrap_or_else(|(f, e)| {
+		copy_and_remove_file_or_dir(flags, &from, &to).unwrap_or_else(|(f, e)| {
 			err!("{}: {e}", f.to_string_lossy());
 		});
 	}
 
 	if flags.verbose {
-		eprintln!("renamed ‘{}’ -> ‘{}’", disp(&from), disp(&to));
+		eprintln!(
+			"{} ‘{}’ -> ‘{}’",
+			if flags.mcp { "copied" } else { "renamed" },
+			disp(&from),
+			disp(&to)
+		);
 	}
 }
 
 fn copy_and_remove_file_or_dir<'a>(
+	flags: &Flags,
 	from: &'a PathBuf,
 	to: &'a PathBuf,
 ) -> Result<(), (&'a PathBuf, io::Error)> {
 	let data = fs::metadata(&from).map_err(|e| (from, e))?;
 	if data.is_dir() {
 		fs::create_dir(&to).map_err(|e| (to, e))?;
-		fs::remove_dir(&from).map_err(|e| (from, e))?
+		if !flags.mcp {
+			fs::remove_dir(&from).map_err(|e| (from, e))?
+		}
 	} else {
 		fs::copy(&from, &to).map_err(|e| (to, e))?;
-		fs::remove_file(&from).map_err(|e| (from, e))?
+		if !flags.mcp {
+			fs::remove_file(&from).map_err(|e| (from, e))?
+		}
 	}
 	Ok(())
 }
