@@ -2,6 +2,7 @@
 
 PREFIX  = /usr/local
 DPREFIX = ${DESTDIR}${PREFIX}
+MANDIR  = ${DPREFIX}/share/man
 
 target = target/release/mmv
 
@@ -11,5 +12,7 @@ ${target}: src/main.rs
 
 install:
 	mkdir -p ${DPREFIX}/bin ${DPREFIX}/share/man/man1
-	cp ${target} ${DPREFIX}/bin
-	cp mmv.1 ${DPREFIX}/share/man/man1
+	cp ${target} ${DPREFIX}/bin/mmv
+	cp ${target} ${DPREFIX}/bin/mcp
+	cp mmv.1 ${MANDIR}/man1
+	ln -sr ${MANDIR}/man1/mmv.1 ${MANDIR}/man1/mcp.1
