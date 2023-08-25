@@ -15,4 +15,4 @@ install:
 	cp ${target} ${DPREFIX}/bin/mmv
 	cp ${target} ${DPREFIX}/bin/mcp
 	cp mmv.1 ${MANDIR}/man1
-	ln -sr ${MANDIR}/man1/mmv.1 ${MANDIR}/man1/mcp.1
+	ln -srf ${MANDIR}/man1/mmv.1 ${MANDIR}/man1/mcp.1
