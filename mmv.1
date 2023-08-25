@@ -1,19 +1,26 @@
-.Dd $Mdocdate: August 15 2023 $
+.Dd $Mdocdate: August 25 2023 $
 .Dt MMV 1
 .Os
 .Sh NAME
-.Nm mmv
-.Nd mapped file moves
+.Nm mmv ,
+.Nm mcp
+.Nd mapped file moves and \-copies
 .Sh SYNOPSIS
 .Nm
 .Op Fl 0deinv
 .Ar command
 .Op Ar argument ...
+.Nm mcp
+.Op Fl 0deiv
+.Ar command
+.Op Ar argument ...
 .Sh DESCRIPTION
 The
-.Nm
-utility is a tool for moving- and renaming files by mapping filenames using a
-provided
+.Nm mmv
+and
+.Nm mcp
+utilities are tools for copying-, moving-, and renaming files by mapping
+filenames using a provided
 .Ar command
 and
 .Ar argument Ns s.
@@ -23,8 +30,10 @@ with the arguments
 .Ar argument ...
 is invoked to read filenames from the standard input and output new filenames to
 the standard output.
-.Nm
-will then move all files that were provided via the standard input to their
+.Nm mmv
+will then move all files — and
+.Nm mcp
+will then copy all files — that were provided via the standard input to their
 coressponding destinations which
 .Ar command
 printed to the standard output.
@@ -56,7 +65,9 @@ This is useful if input filenames might contain embedded newline characters.
 Print the renamings that would take place with the given inputs and arguments to
 the standard error without actually executing any moves.  It is recommended you
 run
-.Nm
+.Nm mmv
+and
+.Nm mcp
 with this flag before performing any changes to ensure nothing unexpected occurs.
 .It Fl e , Fl Fl encode
 Encode newlines in filenames as the literal string
@@ -69,7 +80,9 @@ An example usecase of this is detailed in the
 section.
 .It Fl i , Fl Fl individual
 Spawn a new instance of the command provided to
-.Nm
+.Nm mmv
+or
+.Nm mcp
 for each input filename.
 This is useful for use in conjunction with the
 .Fl 0
@@ -77,13 +90,16 @@ option when provided mapping command doesn’t have built\-in support for
 nul\-byte delimited input.
 .It Fl n , Fl Fl no-backup
 The default behavior of
-.Nm
+.Nm mmv
 is to create a backup of your input files in
 .Pa $XDG_CACHE_DIR/mmv
 to avoid dataloss in the case of an error.
 If for whatever reason you do not want to create this directory
 .Pq perhaps for performance reasons
 then you can use this option.
+.Pp
+This flag does not apply to
+.Nm mcp .
 .It Fl v , Fl Fl verbose
 Display output to the standard error detailing which files and directories are
 being created, moved, and removed.
@@ -96,7 +112,7 @@ operation.  Input files are backed up in a subdirectory whose name is the
 timestamp of when the directory was created.
 .El
 .Sh EXIT STATUS
-.Ex -std
+.Ex -std mmv mcp
 .Sh EXAMPLES
 Swap the files
 .Pa foo
