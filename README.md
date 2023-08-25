@@ -1,12 +1,12 @@
-# mmv — mapped file moves
+# mmv, mcp — mapped file moves and -copies
 
-The `mmv` utility is a command-line tool to help you easily and safely perform
-complex file moves and -renamings.  Unlike almost all file renaming tools I have
-seen online, this utility does not limit you to using specific built-in
-functions which offer only part of the functionality one might need.  This
-utility also tries to be as safe as possible — you would be amazed at how many
-file renaming tools lose your data when you try something as simple as swapping
-two files.
+The `mmv` and `mcp` utilities is a command-line tool to help you easily and
+safely perform complex file copies, -moves, and -renamings.  Unlike almost all
+file renaming tools I have seen online, these utilities do not limit you to
+using specific built-in functions which offer only part of the functionality one
+might need.  These utilities also try to be as safe as possible — you would be
+amazed at how many file renaming tools lose your data when you try something as
+simple as swapping two files.
 
 ## Installation
 
