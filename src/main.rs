@@ -19,6 +19,10 @@ use {
 	tempfile::tempdir,
 };
 
+
+const MMV_DEFAULT_NAME: &str = "mmv";
+const MCP_DEFAULT_NAME: &str = "mcp";
+
 struct Flags {
 	pub backup: bool,
 	pub dryrun: bool,
@@ -54,7 +58,8 @@ impl Flags {
 		let argv0 = env::args().next().unwrap();
 		let p = Path::new(&argv0).file_name().unwrap();
 
-		if p == "mcp" {
+		let mcp_name = option_env!("MCP_NAME").unwrap_or(MCP_DEFAULT_NAME);
+		if p == mcp_name {
 			flags.mcp = true;
 			flags.backup = false;
 		}
@@ -85,7 +90,8 @@ fn usage(bad_flags: Option<lexopt::Error>) -> ! {
 	}
 	let argv0 = env::args().next().unwrap();
 	let p = Path::new(&argv0).file_name().unwrap();
-	if p == "mcp" {
+	let mcp_name = option_env!("MCP_NAME").unwrap_or(MCP_DEFAULT_NAME);
+	if p == mcp_name {
 		eprintln!("Usage: {} [-0deiv] command [argument ...]", p.to_str().unwrap());
 	} else {
 		eprintln!("Usage: {} [-0deinv] command [argument ...]", p.to_str().unwrap());
@@ -173,9 +179,10 @@ fn work() -> Result<(), io::Error> {
 		let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
 			err!("XDG_CACHE_HOME variable must be set");
 		});
+		let mmv_name = option_env!("MMV_NAME").unwrap_or(MMV_DEFAULT_NAME);
 		cache_dir = [
 			Path::new(cache_base.as_str()),
-			Path::new("mmv"),
+			Path::new(mmv_name),
 			Path::new(ts.as_str()),
 		]
 		.iter()

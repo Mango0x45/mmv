@@ -18,6 +18,24 @@ $ make
 $ sudo make install
 ```
 
+The following environment variables can also be set at compile-time to modify
+the names of the generated binaries:
+
+- `$MMV_NAME`
+    + The name of the file-moving binary (default is `mmv`).  This is also used
+      to name the backups folder in `$XDG_CACHE_HOME`.
+- `$MCP_NAME`
+    + The name of the file-copying binary (default is `mcp`).
+
+If you are compiling with a custom binary name, you want to make sure that the
+environment variables actually get used when performing a `make install`.  If
+you’re using `sudo`, you want to do this with the `-E` flag.
+
+```
+$ MMV_NAME=mmv-rs MCP_NAME=mcp-rs make
+$ MMV_NAME=mmv-rs MCP_NAME=mcp-rs sudo -E make install
+```
+
 ## Examples and Documentation
 
 To avoid repeating myself everywhere, if you would like to see usage examples
