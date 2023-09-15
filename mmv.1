@@ -129,13 +129,13 @@ Rename all files in the current directory to use hyphens
 .Pq Sq -
 instead of spaces:
 .Pp
-.Dl $ ls | mmv tr ' ' '-'
+.Dl $ ls | mmv tr \(aq \(aq \(aq-\(aq
 .Pp
 Rename all *.jpeg files to use the
 .Sq .jpg
 file extension:
 .Pp
-.Dl $ ls *.jpeg | mmv sed 's/\e.jpeg$/.jpg/'
+.Dl $ ls *.jpeg | mmv sed \(aqs/\e.jpeg$/.jpg/\(aq
 .Pp
 Rename a given list of movies to use lowercase letters and hyphens instead of
 uppercase letters and spaces, and number them so that they’re properly ordered
@@ -148,8 +148,8 @@ to
 .Pc :
 .Pp
 .Bd -literal -offset indent
-$ ls 'The Fellowship of the Ring.mp4' ... 'The Two Towers.mp4' | \e
-	mmv awk '{ gsub(" ", "-"); printf "%02d-%s", NR, tolower($0) }'
+$ ls \(aqThe Fellowship of the Ring.mp4\(aq ... \(aqThe Two Towers.mp4\(aq | \e
+	mmv awk \(aq{ gsub(" ", "-"); printf "%02d-%s", NR, tolower($0) }\(aq
 .Ed
 .Pp
 Rename files interactively in your editor while encoding newlines into the
@@ -167,7 +167,7 @@ instead of camelCase using the GNU
 .Ql \eL
 extension:
 .Pp
-.Dl $ git ls-files '*.[ch]' | mmv sed 's/[A-Z]/\eL_&/g'
+.Dl $ git ls-files \(aq*.[ch]\(aq | mmv sed \(aqs/[A-Z]/\eL_&/g\(aq
 .Pp
 Lowercase all filenames within a directory hierarchy which may contain newline
 characters:
