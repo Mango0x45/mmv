@@ -4,7 +4,7 @@
 .Sh NAME
 .Nm mmv ,
 .Nm mcp
-.Nd mapped file moves and \-copies
+.Nd mapped file moves and -copies
 .Sh SYNOPSIS
 .Nm
 .Op Fl 0deinv
@@ -39,7 +39,7 @@ coressponding destinations which
 printed to the standard output.
 In other words,
 .Ql mmv cat
-can be seen as a no\-op.
+can be seen as a no-op.
 You can find a variety of examples under the
 .Sx EXAMPLES
 section.
@@ -55,7 +55,7 @@ options might be of use to help you properly handle these.
 The options are as follows:
 .Bl -tag -width Ds
 .It Fl 0 , Fl Fl nul
-Treat filenames read from the standard input as being nul\-byte
+Treat filenames read from the standard input as being nul-byte
 .Pq Sq \e0
 separated instead of newline
 .Pq Sq \en
@@ -74,7 +74,7 @@ Encode newlines in filenames as the literal string
 .Sq \en
 and backslashes as the literal string
 .Sq \e\e .
-This will allow you to treat multi\-line filenames as single\-line ones.
+This will allow you to treat multi-line filenames as single-line ones.
 An example usecase of this is detailed in the
 .Sx EXAMPLES
 section.
@@ -86,8 +86,8 @@ or
 for each input filename.
 This is useful for use in conjunction with the
 .Fl 0
-option when provided mapping command doesn’t have built\-in support for
-nul\-byte delimited input.
+option when provided mapping command doesn’t have built-in support for
+nul-byte delimited input.
 .It Fl n , Fl Fl no-backup
 The default behavior of
 .Nm mmv
@@ -122,7 +122,7 @@ and
 .Dl $ ls foo bar | mmv tac
 .Pp
 Rename all files in the current directory to use hyphens
-.Pq Sq \-
+.Pq Sq -
 instead of spaces:
 .Pp
 .Dl $ ls | mmv tr ' ' '-'
@@ -173,7 +173,7 @@ characters:
 Map filenames which may contain newlines in the current directory with the
 command
 .Ql cmd ,
-which itself does not support nul\-byte separated entries.
+which itself does not support nul-byte separated entries.
 This only works assuming your mapping doesn’t require any context outside of the
 given input filename
 .Po
