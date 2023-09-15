@@ -45,7 +45,8 @@ You can find a variety of examples under the
 section.
 .Pp
 It is also very important to remember that filenames may contain newline
-characters.  The
+characters.
+The
 .Fl 0 ,
 .Fl e ,
 and
@@ -63,12 +64,14 @@ separated.
 This is useful if input filenames might contain embedded newline characters.
 .It Fl d , Fl Fl dry-run
 Print the renamings that would take place with the given inputs and arguments to
-the standard error without actually executing any moves.  It is recommended you
+the standard error without actually executing any moves.
+It is recommended you
 run
 .Nm mmv
 and
 .Nm mcp
-with this flag before performing any changes to ensure nothing unexpected occurs.
+with this flag before performing any changes to ensure nothing unexpected
+occurs.
 .It Fl e , Fl Fl encode
 Encode newlines in filenames as the literal string
 .Sq \en
@@ -108,8 +111,9 @@ being created, moved, and removed.
 .Bl -tag -width $XDG_CACHE_DIR/mmv
 .It Pa $XDG_CACHE_DIR/mmv
 The backup directory where a copy of your input files are stored during
-operation.  Input files are backed up in a subdirectory whose name is the
-timestamp of when the directory was created.
+operation.
+Input files are backed up in a subdirectory whose name is the timestamp of when
+the directory was created.
 .El
 .Sh EXIT STATUS
 .Ex -std mmv mcp
