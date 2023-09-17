@@ -176,12 +176,20 @@ fn work() -> Result<(), io::Error> {
 		let ts = require!(SystemTime::now().duration_since(UNIX_EPOCH))
 			.as_nanos()
 			.to_string();
-		let cache_base = env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
-			err!("XDG_CACHE_HOME variable must be set");
-		});
+		let cache_base = match env::var("XDG_CACHE_HOME") {
+			Ok(s) => PathBuf::from(s),
+			_ => [
+				&env::var("HOME").unwrap_or_else(|_| {
+					err!("XDG_CACHE_HOME or HOME variable must be set");
+				}),
+				".cache",
+			]
+			.iter()
+			.collect::<PathBuf>(),
+		};
 		let mmv_name = option_env!("MMV_NAME").unwrap_or(MMV_DEFAULT_NAME);
 		cache_dir = [
-			Path::new(cache_base.as_str()),
+			cache_base.as_path(),
 			Path::new(mmv_name),
 			Path::new(ts.as_str()),
 		]
