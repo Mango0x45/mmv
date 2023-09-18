@@ -180,7 +180,7 @@ fn work() -> Result<(), io::Error> {
 			Ok(s) => PathBuf::from(s),
 			_ => [
 				&env::var("HOME").unwrap_or_else(|_| {
-					err!("XDG_CACHE_HOME or HOME variable must be set");
+					err!("One of the XDG_CACHE_HOME or HOME variables must be set");
 				}),
 				".cache",
 			]
