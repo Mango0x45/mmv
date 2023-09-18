@@ -1,4 +1,4 @@
-.Dd $Mdocdate: September 15 2023 $
+.Dd $Mdocdate: September 18 2023 $
 .Dt MMV 1
 .Os
 .Sh NAME
@@ -114,6 +114,12 @@ The backup directory where a copy of your input files are stored during
 operation.
 Input files are backed up in a subdirectory whose name is the timestamp of when
 the directory was created.
+If the
+.Ev XDG_CACHE_DIR
+environment variable is not set,
+.Nm
+will default to using
+.Pa $HOME/.cache/mmv .
 .El
 .Sh EXIT STATUS
 .Ex -std mmv mcp
