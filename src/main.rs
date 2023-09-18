@@ -19,7 +19,6 @@ use {
 	tempfile::tempdir,
 };
 
-
 const MMV_DEFAULT_NAME: &str = "mmv";
 const MCP_DEFAULT_NAME: &str = "mcp";
 
@@ -92,9 +91,15 @@ fn usage(bad_flags: Option<lexopt::Error>) -> ! {
 	let p = Path::new(&argv0).file_name().unwrap();
 	let mcp_name = option_env!("MCP_NAME").unwrap_or(MCP_DEFAULT_NAME);
 	if p == mcp_name {
-		eprintln!("Usage: {} [-0deiv] command [argument ...]", p.to_str().unwrap());
+		eprintln!(
+			"Usage: {} [-0deiv] command [argument ...]",
+			p.to_str().unwrap()
+		);
 	} else {
-		eprintln!("Usage: {} [-0deinv] command [argument ...]", p.to_str().unwrap());
+		eprintln!(
+			"Usage: {} [-0deinv] command [argument ...]",
+			p.to_str().unwrap()
+		);
 	}
 	process::exit(1);
 }
