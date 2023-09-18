@@ -108,6 +108,17 @@ fn main() {
 	require!(work())
 }
 
+fn get_default_config_path() -> PathBuf {
+	[
+		&env::var("HOME").unwrap_or_else(|_| {
+			err!("One of the XDG_CACHE_HOME or HOME variables must be set");
+		}),
+		".cache",
+	]
+	.iter()
+	.collect::<PathBuf>()
+}
+
 fn work() -> Result<(), io::Error> {
 	let (flags, rest) = match Flags::parse() {
 		Ok(a) => a,
@@ -182,15 +193,14 @@ fn work() -> Result<(), io::Error> {
 			.as_nanos()
 			.to_string();
 		let cache_base = match env::var("XDG_CACHE_HOME") {
-			Ok(s) => PathBuf::from(s),
-			_ => [
-				&env::var("HOME").unwrap_or_else(|_| {
-					err!("One of the XDG_CACHE_HOME or HOME variables must be set");
-				}),
-				".cache",
-			]
-			.iter()
-			.collect::<PathBuf>(),
+			Ok(s) => {
+				if s.is_empty() {
+					get_default_config_path()
+				} else {
+					PathBuf::from(s)
+				}
+			}
+			_ => get_default_config_path(),
 		};
 		let mmv_name = option_env!("MMV_NAME").unwrap_or(MMV_DEFAULT_NAME);
 		cache_dir = [
