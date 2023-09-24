@@ -1,6 +1,6 @@
 use std::{
 	cmp::Reverse,
-	collections::{hash_map::DefaultHasher, HashSet},
+	collections::{hash_map::DefaultHasher, HashSet, VecDeque},
 	env,
 	ffi::OsString,
 	fs,
@@ -24,6 +24,7 @@ const MCP_DEFAULT_NAME: &str = "mcp";
 
 struct Flags {
 	pub backup: bool,
+	pub basename: bool,
 	pub dryrun: bool,
 	pub encode: bool,
 	pub individual: bool,
@@ -36,6 +37,7 @@ impl Default for Flags {
 	fn default() -> Self {
 		Flags {
 			backup: true,
+			basename: false,
 			dryrun: false,
 			encode: false,
 			individual: false,
@@ -66,6 +68,7 @@ impl Flags {
 		while let Some(arg) = parser.next()? {
 			match arg {
 				Short('0') | Long("nul") => flags.nul = true,
+				Short('b') | Long("basename") => flags.basename = true,
 				Short('d') | Long("dry-run") => flags.dryrun = true,
 				Short('e') | Long("encode") => flags.encode = true,
 				Short('i') | Long("individual") => flags.individual = true,
@@ -92,12 +95,12 @@ fn usage(bad_flags: Option<lexopt::Error>) -> ! {
 	let mcp_name = option_env!("MCP_NAME").unwrap_or(MCP_DEFAULT_NAME);
 	if p == mcp_name {
 		eprintln!(
-			"Usage: {} [-0deiv] command [argument ...]",
+			"Usage: {} [-0bdeiv] command [argument ...]",
 			p.to_str().unwrap()
 		);
 	} else {
 		eprintln!(
-			"Usage: {} [-0deinv] command [argument ...]",
+			"Usage: {} [-0bdeinv] command [argument ...]",
 			p.to_str().unwrap()
 		);
 	}
@@ -303,17 +306,25 @@ fn run_indiv(
 				err!("Failed to spawn utility: “{}”: {e}", cmd.to_str().unwrap());
 			});
 
+		let mut components = vec![];
 		{
 			let mut ci = child.stdin.take().unwrap_or_else(|| {
 				err!("Could not open the child process’ stdin");
 			});
+			let s;
+			if flags.basename {
+				components = Path::new(src).components().collect_vec();
+				s = components.pop().unwrap().as_os_str().to_str().unwrap();
+			} else {
+				s = src;
+			}
 			write!(
 				ci,
 				"{}",
 				if flags.encode {
-					encode_string(src)
+					encode_string(s)
 				} else {
-					src.to_owned()
+					s.to_string()
 				}
 			)?;
 		}
@@ -323,11 +334,18 @@ fn run_indiv(
 		});
 		let mut s = String::with_capacity(src.len());
 		co.read_to_string(&mut s)?;
-		dsts.push(if flags.encode {
+		let s = if flags.encode {
 			decode_string(s.as_str())
 		} else {
 			s
-		});
+		};
+
+		if flags.basename {
+			let path = components.iter().collect::<PathBuf>().join(s);
+			dsts.push(path.to_str().unwrap().to_string());
+		} else {
+			dsts.push(s);
+		}
 
 		/* If the process failed, it is expected to print an error message; as such,
 		   we exit directly. */
@@ -356,19 +374,36 @@ fn run_multi(
 		});
 
 	/* Pass the source files to the child process. */
+	let mut components_vec = VecDeque::with_capacity(srcs.len());
+
 	{
 		let ci = child.stdin.take().unwrap_or_else(|| {
 			err!("Could not open the child process’ stdin");
 		});
 		let mut ci = BufWriter::new(ci);
 		for src in srcs {
+			let s = if flags.basename {
+				let components = Path::new(src).components().collect_vec();
+				components_vec.push_back(components);
+				components_vec
+					.back_mut()
+					.unwrap()
+					.pop()
+					.unwrap()
+					.as_os_str()
+					.to_str()
+					.unwrap()
+			} else {
+				src
+			};
+
 			write!(
 				ci,
 				"{}",
 				if flags.encode {
-					encode_string(src)
+					encode_string(s)
 				} else {
-					src.to_owned()
+					s.to_owned()
 				}
 			)?;
 			ci.write_all(if flags.nul && !flags.encode {
@@ -395,11 +430,16 @@ fn run_multi(
 		})
 		.for_each(|x| {
 			let dst = require!(String::from_utf8(x.collect_vec()));
-			dsts.push(if flags.encode {
-				decode_string(&dst)
+
+			let s = if flags.basename {
+				let components = require!(components_vec.pop_front(), "WOW");
+				let path = components.iter().collect::<PathBuf>().join(dst);
+				path.to_str().unwrap().to_string()
 			} else {
 				dst
-			});
+			};
+
+			dsts.push(if flags.encode { decode_string(&s) } else { s });
 		});
 
 	/* If the process failed, it is expected to print an error message; as such,

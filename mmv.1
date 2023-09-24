@@ -1,4 +1,4 @@
-.Dd $Mdocdate: September 18 2023 $
+.Dd $Mdocdate: September 24 2023 $
 .Dt MMV 1
 .Os
 .Sh NAME
@@ -7,11 +7,11 @@
 .Nd mapped file moves and -copies
 .Sh SYNOPSIS
 .Nm
-.Op Fl 0deinv
+.Op Fl 0bdeinv
 .Ar command
 .Op Ar argument ...
 .Nm mcp
-.Op Fl 0deiv
+.Op Fl 0bdeiv
 .Ar command
 .Op Ar argument ...
 .Sh DESCRIPTION
@@ -62,6 +62,14 @@ separated instead of newline
 .Pq Sq \en
 separated.
 This is useful if input filenames might contain embedded newline characters.
+.It Fl b , Fl Fl basename
+Only apply the mapping command to the basenames of the given file paths.
+This stops you from accidentally mutating directory components, which is not
+typically a desired behavior.
+If no basename can be derived
+.Pq the root directory for example has no basename ,
+then a warning diagnostic will be printed to the standard error, and the path
+will remain unchanged.
 .It Fl d , Fl Fl dry-run
 Print the renamings that would take place with the given inputs and arguments to
 the standard error without actually executing any moves.
@@ -192,6 +200,16 @@ knowledge of the input files position in the input list
 .Pc :
 .Pp
 .Dl $ ls --zero | mmv -0i cmd
+.Pp
+Uppercase the files in the
+.Pa /foo/bar
+directory, while leaving the names of
+.Pa foo
+and
+.Pa bar
+unchanged:
+.Pp
+.Dl $ ls /foo/bar/* | mmv -b tr a-z A-Z
 .Sh SEE ALSO
 .Xr awk 1 ,
 .Xr cp 1 ,
