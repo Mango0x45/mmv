@@ -1,0 +1,92 @@
+#!/bin/sh
+
+fail() {
+	echo "$1" >&2
+	exit 1
+}
+
+testmmv() {
+	DIR=test-mmv
+	mkdir -p $DIR
+	touch \
+		$DIR/bytecodeVm.c \
+		$DIR/fastLexer.c  \
+		$DIR/fastLexer.h  \
+		$DIR/slowParser.c \
+		$DIR/slowParser.h
+	ls $DIR/*.[ch] | mmv sed 's/[A-Z]/\L-&/g'
+	>/dev/null ls \
+		$DIR/bytecode-vm.c \
+		$DIR/fast-lexer.c  \
+		$DIR/fast-lexer.h  \
+		$DIR/slow-parser.c \
+		$DIR/slow-parser.h \
+	|| fail 'Missing lispcase files'
+	2>/dev/null ls \
+		$DIR/bytecodeVm.c \
+		$DIR/fastLexer.c  \
+		$DIR/fastLexer.h  \
+		$DIR/slowParser.c \
+		$DIR/slowParser.h \
+	&& fail 'Camelcase files not properly deleted'
+	return 0
+}
+
+testmcp() {
+	DIR=test-mcp
+	mkdir -p $DIR
+	touch \
+		$DIR/bytecodeVm.c \
+		$DIR/fastLexer.c  \
+		$DIR/fastLexer.h  \
+		$DIR/slowParser.c \
+		$DIR/slowParser.h
+	ls $DIR/*.[ch] | mcp sed 's/[A-Z]/\L-&/g'
+	>/dev/null ls \
+		$DIR/bytecode-vm.c \
+		$DIR/fast-lexer.c  \
+		$DIR/fast-lexer.h  \
+		$DIR/slow-parser.c \
+		$DIR/slow-parser.h \
+	|| fail 'Missing lispcase files'
+	>/dev/null ls \
+		$DIR/bytecodeVm.c \
+		$DIR/fastLexer.c  \
+		$DIR/fastLexer.h  \
+		$DIR/slowParser.c \
+		$DIR/slowParser.h \
+	|| fail 'Camelcase files not found'
+	return 0
+}
+
+testmmvbasename() {
+	DIR=test-mmv-basename
+	mkdir -p $DIR
+	touch \
+		$DIR/bytecode-vm.c \
+		$DIR/fast-lexer.c  \
+		$DIR/fast-lexer.h  \
+		$DIR/slow-parser.c \
+		$DIR/slow-parser.h
+	ls $DIR/*.[ch] | mmv --basename tr a-z A-Z
+	>/dev/null ls \
+		$DIR/BYTECODE-VM.C \
+		$DIR/FAST-LEXER.C  \
+		$DIR/FAST-LEXER.H  \
+		$DIR/SLOW-PARSER.C \
+		$DIR/SLOW-PARSER.H \
+	|| fail 'Uppercase files not found'
+	2>/dev/null ls \
+		$DIR/bytecode-vm.c \
+		$DIR/fast-lexer.c  \
+		$DIR/fast-lexer.h  \
+		$DIR/slow-parser.c \
+		$DIR/slow-parser.h \
+	&& fail 'Lowercase files found'
+	return 0
+}
+
+trap 'rm -rf test-mmv test-mcp test-mmv-basename' EXIT
+testmmv
+testmcp
+testmmvbasename
